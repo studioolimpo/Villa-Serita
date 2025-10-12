@@ -1531,66 +1531,66 @@ function initLoader(opts = {}) {
  * RESET WEBFLOW
  * Reinizializza IX2 e altri componenti Webflow dopo ogni transizione Barba
  ***********************/
-function resetWebflow(data) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(data.next.html, "text/html");
-  const webflowPageId = doc.querySelector("html")?.getAttribute("data-wf-page");
+// function resetWebflow(data) {
+//   const parser = new DOMParser();
+//   const doc = parser.parseFromString(data.next.html, "text/html");
+//   const webflowPageId = doc.querySelector("html")?.getAttribute("data-wf-page");
 
-  // Aggiorna ID pagina Webflow
-  if (webflowPageId) {
-    document.documentElement.setAttribute("data-wf-page", webflowPageId);
-  }
+//   // Aggiorna ID pagina Webflow
+//   if (webflowPageId) {
+//     document.documentElement.setAttribute("data-wf-page", webflowPageId);
+//   }
 
-  // Reinizializza le interazioni Webflow IX2
-  if (window.Webflow) {
-    try {
-      window.Webflow.destroy?.();
-      window.Webflow.ready?.();
+//   // Reinizializza le interazioni Webflow IX2
+//   if (window.Webflow) {
+//     try {
+//       window.Webflow.destroy?.();
+//       window.Webflow.ready?.();
 
-      const ix2 = window.Webflow.require?.("ix2");
-      if (ix2 && typeof ix2.init === "function") {
-        ix2.init();
-      }
+//       const ix2 = window.Webflow.require?.("ix2");
+//       if (ix2 && typeof ix2.init === "function") {
+//         ix2.init();
+//       }
 
-      window.Webflow.redraw?.up?.();
-      console.log("✅ Webflow IX2 reinitialized");
-    } catch (err) {
-      console.warn("⚠️ Errore nella reinizializzazione di Webflow:", err);
-    }
-  }
+//       window.Webflow.redraw?.up?.();
+//       console.log("✅ Webflow IX2 reinitialized");
+//     } catch (err) {
+//       console.warn("⚠️ Errore nella reinizializzazione di Webflow:", err);
+//     }
+//   }
 
-  // Rimuove e riapplica la classe 'w--current' ai link corretti
-  document.querySelectorAll(".w--current").forEach(el => el.classList.remove("w--current"));
-  document.querySelectorAll("a").forEach(link => {
-    if (link.getAttribute("href") === window.location.pathname) {
-      link.classList.add("w--current");
-    }
-  });
+//   // Rimuove e riapplica la classe 'w--current' ai link corretti
+//   document.querySelectorAll(".w--current").forEach(el => el.classList.remove("w--current"));
+//   document.querySelectorAll("a").forEach(link => {
+//     if (link.getAttribute("href") === window.location.pathname) {
+//       link.classList.add("w--current");
+//     }
+//   });
 
-  // Riesegue eventuali script inline personalizzati con attributo data-barba-script
-  doc.querySelectorAll("[data-barba-script]").forEach((scriptEl) => {
-    let codeString = scriptEl.textContent || "";
-    if (codeString.includes("DOMContentLoaded")) {
-      codeString = codeString
-        .replace(/window\.addEventListener\("DOMContentLoaded",.*?=>\s*{/, "")
-        .replace(/}\);?$/, "");
-    }
+//   // Riesegue eventuali script inline personalizzati con attributo data-barba-script
+//   doc.querySelectorAll("[data-barba-script]").forEach((scriptEl) => {
+//     let codeString = scriptEl.textContent || "";
+//     if (codeString.includes("DOMContentLoaded")) {
+//       codeString = codeString
+//         .replace(/window\.addEventListener\("DOMContentLoaded",.*?=>\s*{/, "")
+//         .replace(/}\);?$/, "");
+//     }
 
-    const newScript = document.createElement("script");
-    newScript.type = "text/javascript";
-    const srcAttr = scriptEl.getAttribute("src");
-    if (srcAttr) {
-      newScript.src = srcAttr;
-    } else {
-      newScript.textContent = codeString;
-    }
+//     const newScript = document.createElement("script");
+//     newScript.type = "text/javascript";
+//     const srcAttr = scriptEl.getAttribute("src");
+//     if (srcAttr) {
+//       newScript.src = srcAttr;
+//     } else {
+//       newScript.textContent = codeString;
+//     }
 
-    document.body.appendChild(newScript);
-    newScript.remove();
-  });
+//     document.body.appendChild(newScript);
+//     newScript.remove();
+//   });
 
-  console.log("🔁 Webflow reset completato");
-}
+//   console.log("🔁 Webflow reset completato");
+// }
 
 
 
