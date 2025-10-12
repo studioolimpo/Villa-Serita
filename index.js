@@ -621,12 +621,12 @@ function resetThemeToLight(opts = {}) {
  * Gestisce il cambio tema della navbar (dark → light) in base al namespace
  ***********************/
 const navbarThemeTriggers = {
-  home: { startTheme: "dark", trigger: "#hero-section" },
-  villa: { startTheme: "dark", trigger: "#hero-section" },
-  matrimoni: { startTheme: "dark", trigger: "#hero-section" },
-  eventi: { startTheme: "dark", trigger: "#hero-section" },
-  ristorante: { startTheme: "dark", trigger: "#hero-section" },
-  esperienze: { startTheme: "dark", trigger: "#hero-section" },
+  home: { startTheme: "dark", trigger: "#section-hero" },
+  villa: { startTheme: "dark", trigger: "#section-hero" },
+  matrimoni: { startTheme: "dark", trigger: "#section-hero" },
+  eventi: { startTheme: "dark", trigger: "#section-hero" },
+  ristorante: { startTheme: "dark", trigger: "#section-hero" },
+  esperienze: { startTheme: "dark", trigger: "#section-hero" },
 };
 
 function initNavbarTheme(namespace, retryCount = 0) {
@@ -1074,7 +1074,7 @@ barba.hooks.before(() => {
 
 // HERO HOME
 function initHeroHome(scope = document) {
-  const section = scope.querySelector('#hero-section');
+  const section = scope.querySelector('#section-hero');
   if (!section) return null;
 
   
@@ -1124,7 +1124,7 @@ function initHeroHome(scope = document) {
 
 // HERO VILLA
 function initHeroVilla(scope = document) {
-  const section   = scope.querySelector('#hero-section');
+  const section   = scope.querySelector('#section-hero');
   if (!section) return null;
 
   const bg        = section.querySelector('.u-background-skeleton');
