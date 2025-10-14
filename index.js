@@ -677,6 +677,7 @@ function getStartThemeForNs(namespace = "home") {
     eventi: { startTheme: "dark" },
     ristorante: { startTheme: "dark" },
     esperienze: { startTheme: "dark" },
+    esperienza: { startTheme: "light" },
     contatti: { startTheme: "light" },
   };
   return (navbarConfig[namespace]?.startTheme) || "dark";
@@ -1306,6 +1307,97 @@ function initAccordion(scope = document) {
 }
 
 
+/***********************
+ * MODAL HANDLER — apertura automatica con controllo attributo
+ ***********************/
+function initModalAuto() {
+  document.addEventListener("DOMContentLoaded", function () {
+    const modalSystem = ((window.lumos ??= {}).modal ??= {
+      list: {},
+      open(id) { this.list[id]?.open?.(); },
+      closeAll() { Object.values(this.list).forEach((m) => m.close?.()); },
+    });
+
+    function createModals() {
+      document.querySelectorAll(".modal_dialog").forEach(function (modal) {
+        if (modal.dataset.scriptInitialized) return;
+        modal.dataset.scriptInitialized = "true";
+
+        const modalId = modal.getAttribute("data-modal-target");
+        let lastFocusedElement;
+
+        // GSAP timeline di apertura/chiusura
+        if (typeof gsap !== "undefined") {
+          gsap.context(() => {
+            let tl = gsap.timeline({ paused: true, onReverseComplete: resetModal });
+            tl.fromTo(modal, { opacity: 0 }, { opacity: 1, duration: 0.7, ease: "power2.out" });
+            tl.fromTo(".modal_content", { yPercent: 10, filter: "blur(5px)" }, { yPercent: 0, filter: "blur(0px)", duration: 0.9, ease: "loader" }, "<");
+            modal.tl = tl;
+          }, modal);
+        }
+
+        function resetModal() {
+          if (typeof lenis !== "undefined" && lenis.start) lenis.start();
+          else document.body.style.overflow = "";
+          modal.close();
+          if (lastFocusedElement) lastFocusedElement.focus();
+          window.dispatchEvent(new CustomEvent("modal-close", { detail: { modal } }));
+        }
+
+        function openModal() {
+          if (typeof lenis !== "undefined" && lenis.stop) lenis.stop();
+          else document.body.style.overflow = "hidden";
+          lastFocusedElement = document.activeElement;
+          modal.showModal();
+          modal.querySelector(':focus')?.blur();
+          if (typeof gsap !== "undefined") modal.tl.play();
+          modal.querySelectorAll("[data-modal-scroll]").forEach((el) => (el.scrollTop = 0));
+          window.dispatchEvent(new CustomEvent("modal-open", { detail: { modal } }));
+        }
+
+        function closeModal() {
+          if (typeof gsap === "undefined") {
+            resetModal();
+            return;
+          }
+
+          const content = modal.querySelector(".modal_content");
+
+          const tlClose = gsap.timeline({
+            defaults: { ease: "power2.inOut", duration: 0.7 },
+            onComplete: resetModal,
+          });
+
+          tlClose
+            .to(content, { yPercent: -20, autoAlpha: 0, filter: "blur(5px)" }, 0.5)
+            .to(modal, { opacity: 0, duration: 0.5 }, "<0.1");
+        }
+
+        // Eventi base
+        modal.addEventListener("cancel", (e) => (e.preventDefault(), closeModal()));
+        modal.addEventListener("click", (e) => e.target.closest("[data-modal-close]") && closeModal());
+        modalSystem.list[modalId] = { open: openModal, close: closeModal };
+
+        // 🔹 Apertura automatica condizionata
+        const modalActive = modal.getAttribute("data-modal-active") === "true";
+        if (modalActive) {
+          setTimeout(() => {
+            // Ricontrolla che sia ancora attivo prima di aprire
+            if (modal.getAttribute("data-modal-active") === "true") {
+              openModal();
+              console.log(`🟢 Modal "${modalId}" aperto automaticamente dopo 7s`);
+            }
+          }, 5000);
+        } else {
+          console.log(`⚪ Modal "${modalId}" disattivato (data-modal-active="false")`);
+        }
+      });
+    }
+
+    createModals();
+  });
+}
+
 
 /***********************
  * HERO — FUNZIONI SPECIFICHE
@@ -1869,13 +1961,13 @@ function resetWebflow(data) {
       }
     }, 100); // leggero delay per sicurezza
 
-    // Ripristina classi w--current
-    document.querySelectorAll(".w--current").forEach(el => el.classList.remove("w--current"));
-    document.querySelectorAll("a").forEach(link => {
-      if (link.getAttribute("href") === window.location.pathname) {
-        link.classList.add("w--current");
-      }
-    });
+    // // Ripristina classi w--current
+    // document.querySelectorAll(".w--current").forEach(el => el.classList.remove("w--current"));
+    // document.querySelectorAll("a").forEach(link => {
+    //   if (link.getAttribute("href") === window.location.pathname) {
+    //     link.classList.add("w--current");
+    //   }
+    // });
 
     console.log("🔁 Webflow reset completato");
   } catch (err) {
@@ -1924,6 +2016,7 @@ once: async ({ next }) => {
   initCustomCursor();
   preventSamePageClicks();
   initFormSuccessTransition();
+  initModalAuto();
 
   if (ns === "matrimoni") {
     initSliderReview(next.container);
@@ -1981,7 +2074,8 @@ once: async ({ next }) => {
         }
         if (titleEl) titleEl.textContent = nextLabel || "";
 
-        return gsap.timeline({ defaults: { ease: "loader", duration: 1 } })
+
+        return gsap.timeline({ defaults: { ease: "loader", duration: 1 }})
           .set(panelEl, { display: "block", visibility: "visible", yPercent: 100 })
           .to(data.current.container, { y: "-15vh" }, "<")
           .to(panelEl, { yPercent: 0 }, "<")
@@ -2057,7 +2151,7 @@ once: async ({ next }) => {
     targetId === "transition-contact" ||
     targetId === "transition-newsletter"
   ) {
-    nextDelay = 3;
+    nextDelay = 5;
   }
 
   const tl = gsap.timeline({ defaults: { ease: "loader", duration: 1.2 } })
@@ -2149,6 +2243,19 @@ once: async ({ next }) => {
   ]
 });
 
+// 🕓 Hook globale per ritardare l'avvio di leave se viene da un modal
+barba.hooks.beforeLeave(async () => {
+  
+    // 🔹 Se esiste un modal aperto, chiudilo e attendi prima di procedere
+  const openModal = document.querySelector(".modal_dialog[open]");
+  if (openModal) {
+    console.log("🟡 Modal aperto → chiusura e ritardo transizione");
+    lumos.modal.closeAll();
+    await new Promise((resolve) => setTimeout(resolve, 600)); // attende 0.2s reali
+  }
+
+});
+
 // Aggiorna lo stato "current" nella navbar basandosi sul namespace attivo
 function updateCurrentNav(currentNs) {
   // Reset di tutti i link
@@ -2199,6 +2306,7 @@ barba.hooks.beforeEnter((data) => {
     updateCurrentNav(nextNs);
   }
 
+  
   initHideNavbarOnScroll(50);
 
   // 🔹 Disattiva temporaneamente tutti gli ScrollTrigger
