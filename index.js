@@ -1084,65 +1084,52 @@ function preventSamePageClicks() {
 /***********************
  * FORM SUCCESS → Trigger Barba con pannello personalizzato
  ***********************/
-function initFormSuccessTransition() {
-  if (window.__wfFormSuccessBound) return;
-  window.__wfFormSuccessBound = true;
+function initFormSuccessTransition(scope = document) {
+// Seleziona solo i form Webflow all’interno dello scope (utile per Barba)
+  const $forms = $(scope).find(".w-form form");
 
-  // 🔹 Registro form → pannello di transizione
-  const FORM_TRANSITION_REGISTRY = {
-    "Form Contatti": "#transition-contact",
-    "Form Newsletter": "#transition-newsletter",
-    "Form Matrimoni": "#transition-contact",
-    "Form Eventi Privati": "#transition-contact",
-  };
+  $forms.each(function () {
+    const $form = $(this);
+    if ($form.data("bound-success")) return;
+    $form.data("bound-success", true);
 
-  // Ascolta completamento AJAX di Webflow
-  $(document).on("ajaxComplete", function (event, xhr, settings) {
-    // Cerca un form che ha ricevuto la classe di successo
-    const $doneForms = $(".w-form-done").closest("form");
-    if (!$doneForms.length) return;
-
-    $doneForms.each(function () {
-      const form = this;
-      const formName = form.getAttribute("name") || "Form generico";
-      console.log("✅ Form completato:", formName);
-
-      // Previeni doppi trigger
-      if (form.__barbaHandled) return;
-      form.__barbaHandled = true;
-
-      const target = FORM_TRANSITION_REGISTRY[formName] || ".transition_wrap";
-      window.__formJustSubmitted = true;
-      window.__barbaTransitionTarget = target;
-
-      console.log(`🚀 Avvio transizione Barba → ${target}`);
-
-      // ✳️ Aggiungi un piccolo delay per garantire che Webflow termini davvero l’invio
+    $form.on("submit", function () {
       setTimeout(() => {
-        if (window.barba) {
-          barba.go("/");
-        } else {
-          window.location.href = "/";
+        const $success = $form.closest(".w-form").find(".w-form-done");
+        if ($success.length) {
+
+          // 🔹 Nasconde messaggio di successo standard
+          $success.hide();
+
+          // 🔹 Mantiene visibile il form
+          $form.show();
+
+          // 🔹 Determina il tipo di form
+          const formName = $form.attr("name") || "";
+          let panelTarget = "#transition-default"; // default
+
+          if (formName.toLowerCase().includes("newsletter")) {
+            panelTarget = "#transition-newsletter";
+          } else if (
+            formName.toLowerCase().includes("contatti") ||
+            formName.toLowerCase().includes("matrimoni") ||
+            formName.toLowerCase().includes("eventi")
+          ) {
+            panelTarget = "#transition-contact";
+          }
+
+          // 🔹 Registra il pannello scelto
+          window.__barbaTransitionTarget = panelTarget;
+
+          console.log(`✅ Form inviato → ${formName} → pannello ${panelTarget}`);
+
+          // 🔹 Avvia la transizione standard
+          if (window.barba) barba.go("/");
         }
-      }, 500); // mezzo secondo = garantisce che la mail parta prima della transizione
+      }, 1200);
     });
   });
 }
-
-// Hook di sicurezza per Barba
-barba.hooks.before(() => {
-  if (window.__formJustSubmitted) {
-    if (typeof $(document).off === "function") $(document).off("ajaxComplete");
-  }
-});
-
-// E nel tuo hook barba, prima di ogni transizione:
-barba.hooks.before(() => {
-  // Se la transizione è appena stata causata da un form, non rilanciarla
-  if (window.__formJustSubmitted) {
-    if (typeof $(document).off === "function") $(document).off("ajaxComplete");
-  }
-});
 
 
 /***********************
@@ -1770,6 +1757,60 @@ function initLoader(opts = {}) {
 //   console.log("🔁 Webflow reset completato");
 // }
 
+function resetWebflow(data) {
+  if (typeof window.Webflow === "undefined") return;
+
+  try {
+    // Aggiorna ID pagina Webflow
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(data.next.html, "text/html");
+    const webflowPageId = doc.querySelector("html")?.getAttribute("data-wf-page");
+    if (webflowPageId) {
+      document.documentElement.setAttribute("data-wf-page", webflowPageId);
+    }
+
+    // Distruggi e reinizializza Webflow
+    window.Webflow.destroy?.();
+
+    setTimeout(() => {
+      try {
+        window.Webflow.ready?.();
+
+        // 🔹 Reinizializza IX2 (interazioni)
+        const ix2 = window.Webflow.require?.("ix2");
+        if (ix2 && typeof ix2.init === "function") {
+          ix2.init();
+          console.log("✅ Webflow IX2 reinitialized");
+        } else {
+          console.log("⚠️ Webflow IX2 non disponibile, salto init");
+        }
+
+        // 🔹 Reinizializza Forms se serve (per sicurezza nei submit)
+        const forms = window.Webflow.require?.("forms");
+        if (forms && typeof forms.ready === "function") {
+          forms.ready();
+          console.log("✅ Webflow Forms reinitialized");
+        }
+
+        window.Webflow.redraw?.up?.();
+      } catch (innerErr) {
+        console.warn("⚠️ Errore durante il reset Webflow:", innerErr);
+      }
+    }, 100); // leggero delay per sicurezza
+
+    // Ripristina classi w--current
+    document.querySelectorAll(".w--current").forEach(el => el.classList.remove("w--current"));
+    document.querySelectorAll("a").forEach(link => {
+      if (link.getAttribute("href") === window.location.pathname) {
+        link.classList.add("w--current");
+      }
+    });
+
+    console.log("🔁 Webflow reset completato");
+  } catch (err) {
+    console.warn("⚠️ Errore nella reinizializzazione di Webflow:", err);
+  }
+}
 
 
 
@@ -1837,31 +1878,35 @@ once: async ({ next }) => {
 
       /* Uscita pagina corrente */
       leave(data) {
-        // Decidi quale wrapper usare per la transizione: custom o default
-        let wrap = null;
-        if (window.__barbaTransitionTarget) {
-          wrap = document.querySelector(window.__barbaTransitionTarget);
-        }
-        if (!wrap) {
-          wrap = document.querySelector(".transition_wrap");
-        }
-        const sealEl = wrap?.querySelector(".transition_seal");
-        const titleEl = wrap?.querySelector(".transition_title");
-        const textEl = wrap?.querySelector(".transition_text");
-        const starTopEl = wrap?.querySelector("#spinstartop");
-        let nextLabel = getNextLabel(data);
+        // Determina quale pannello usare
+        let panelEl;
 
-        // Se la transizione non è quella di default, forziamo il titolo "Grazie"
-        if (window.__barbaTransitionTarget && window.__barbaTransitionTarget !== ".transition_wrap") {
+        if (window.__barbaTransitionTarget) {
+          panelEl = document.querySelector(window.__barbaTransitionTarget);
+          console.log("🎯 Pannello personalizzato:", window.__barbaTransitionTarget);
+          window.__lastTransitionPanel = panelEl;
+          delete window.__barbaTransitionTarget;
+        } else {
+          panelEl = document.querySelector("#transition-default");
+          console.log("🎯 Pannello standard (default)");
+          window.__lastTransitionPanel = panelEl;
+        }
+
+        const sealEl = panelEl?.querySelector(".transition_seal");
+        const titleEl = panelEl?.querySelector(".transition_title");
+        const textEl = panelEl?.querySelector(".transition_text");
+        const starTopEl = panelEl?.querySelector("#spinstartop");
+        // 🔹 Imposta il titolo a "Grazie" se il pannello non è quello di default
+        let nextLabel = getNextLabel(data);
+        if (panelEl && panelEl.id !== "transition-default") {
           nextLabel = "Grazie";
         }
-
         if (titleEl) titleEl.textContent = nextLabel || "";
 
         return gsap.timeline({ defaults: { ease: "loader", duration: 1 } })
-          .set(wrap, { display: "block", visibility: "visible", yPercent: 100 })
+          .set(panelEl, { display: "block", visibility: "visible", yPercent: 100 })
           .to(data.current.container, { y: "-15vh" }, "<")
-          .to(wrap, { yPercent: 0 }, "<")
+          .to(panelEl, { yPercent: 0 }, "<")
           // Animazione transition_seal (solo autoAlpha)
           .fromTo(
             sealEl,
@@ -1915,49 +1960,57 @@ once: async ({ next }) => {
       },
       
       enter(data) {
-        // Decidi quale wrapper usare per la transizione: custom o default
-        let wrap = null;
-        if (window.__barbaTransitionTarget) {
-          wrap = document.querySelector(window.__barbaTransitionTarget);
-        }
-        if (!wrap) {
-          wrap = document.querySelector(".transition_wrap");
-        }
-        const starBottomEl = wrap?.querySelector("#spinstarbottom");
+  // Decidi quale wrapper usare per la transizione: custom o default
+  // 🔹 Recupera il pannello usato nella transizione precedente
+  const panelEl = window.__lastTransitionPanel || document.querySelector("#transition-default");
+  const wrap = panelEl;
+  const starBottomEl = wrap?.querySelector("#spinstarbottom");
 
-        // Calcola qui il ritardo d'ingresso del next.container
-        const isCustomTransition = window.__barbaTransitionTarget && window.__barbaTransitionTarget !== ".transition_wrap";
-        const nextDelay = isCustomTransition ? 1.5 : 0.1; // più lento nei form
+  // 🔹 Delay personalizzato per transizioni specifiche
+  let nextDelay = 0;
+  const targetId =
+    window.__barbaTransitionTarget ||
+    window.__lastTransitionPanel?.id ||
+    "#transition-default";
 
-        const tl = gsap.timeline({ defaults: { ease: "loader", duration: 1.2 } })
-          .add(() => {
-            if (starBottomEl) gsap.set(starBottomEl, { rotation: 0 });
-          }, 0)
-          .fromTo(
-            starBottomEl,
-            { rotation: 0 },
-            { rotation: 360, duration: 1.3, ease: 'spinStar', transformOrigin: 'center center', autoForce3D: true },
-          )
-          .from(data.next.container, { y: "15vh", delay: nextDelay }, "<0.2")
-          .to(wrap, { yPercent: -100 }, "<")
-          .set(wrap, { yPercent: 100, display: "none", visibility: "hidden" });
+  if (
+    targetId === "#transition-contact" ||
+    targetId === "#transition-newsletter" ||
+    targetId === "transition-contact" ||
+    targetId === "transition-newsletter"
+  ) {
+    nextDelay = 4;
+  }
 
-        // sovrapponi la hero del namespace in ingresso solo se esiste
-        try {
-          const ns = getNextNamespace(data);
-          const heroTl = buildHeroForNamespace(ns, data.next.container);
-          if (heroTl) {
-            tl.add(heroTl, "-=0.7");
-          }
-        } catch {}
+  const tl = gsap.timeline({ defaults: { ease: "loader", duration: 1.2 } })
+    .add(() => {
+      if (starBottomEl) gsap.set(starBottomEl, { rotation: 0 });
+    }, 0)
+    .fromTo(
+      starBottomEl,
+      { rotation: 0 },
+      { rotation: 360, duration: 1.3, ease: 'spinStar', transformOrigin: 'center center', autoForce3D: true },
+    )
+    .from(data.next.container, { y: "15vh", delay: nextDelay }, "<0.2")
+    .to(wrap, { yPercent: -100 }, "<")
+    .set(wrap, { yPercent: 100, display: "none", visibility: "hidden" });
 
-        // Reset flag dopo uso
-        if (window.__barbaTransitionTarget) {
-          window.__barbaTransitionTarget = null;
-        }
+  // sovrapponi la hero del namespace in ingresso solo se esiste
+  try {
+    const ns = getNextNamespace(data);
+    const heroTl = buildHeroForNamespace(ns, data.next.container);
+    if (heroTl) {
+      tl.add(heroTl, "-=0.7");
+    }
+  } catch {}
 
-        return tl;
-      }
+  // Reset flag dopo uso
+  if (window.__barbaTransitionTarget) {
+    window.__barbaTransitionTarget = null;
+  }
+
+  return tl;
+}
     }
   ],
   views: [
@@ -2077,6 +2130,10 @@ barba.hooks.beforeEnter((data) => {
   initGlobalParallax(scope);
   initGlobalSlider(scope);
   forceNextPageToTop();
+});
+
+barba.hooks.enter((data) => {
+  if (typeof resetWebflow === "function") resetWebflow(data);
 });
 
 barba.hooks.afterEnter((data) => {

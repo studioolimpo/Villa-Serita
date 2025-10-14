@@ -946,6 +946,7 @@ once: async ({ next }) => {
   initSignature();
   initCustomCursor();
   preventSamePageClicks();
+  initSimpleFormSuccess(scope);
 
   // 3) Prepara hero ma in pausa
   const ns = next?.container?.getAttribute('data-barba-namespace') || 'home';
@@ -1092,7 +1093,8 @@ barba.hooks.beforeEnter(({ next }) => {
   initSectionReveal(scope);
   initGlobalParallax(scope);
   initGlobalSlider(scope);
-  initAnimateThemeScroll(scope);              
+  initAnimateThemeScroll(scope);
+  // initSimpleFormSuccess(scope); // Spostato in afterEnter
 
   forceNextPageToTop();
 });
@@ -1104,4 +1106,95 @@ barba.hooks.after((data) => {
   initCurrentYear(scope);
 });
 
-barba.hooks.afterEnter(() => {});
+barba.hooks.afterEnter(({ next }) => {
+  const scope = next?.container || document;
+  initSimpleFormSuccess(scope);
+});
+
+/***********************
+ * FORM SUCCESS — gestito con Webflow + Barba
+ ***********************/
+function initSimpleFormSuccess(scope = document) {
+  // Seleziona solo i form all’interno dello scope (utile per Barba)
+  const $forms = $(scope).find(".w-form form");
+
+  $forms.each(function () {
+    const $form = $(this);
+
+    // Evita doppi binding
+    if ($form.data("bound-success")) return;
+    $form.data("bound-success", true);
+
+    // Intercetta evento submit
+    $form.on("submit", function () {
+      // ⏱️ Timeout per attendere il success di Webflow
+      setTimeout(() => {
+        const $success = $form.closest(".w-form").find(".w-form-done");
+        if ($success.length) {
+          // 🔹 Nasconde il messaggio di successo standard
+          $success.hide();
+
+          // 🔹 Avvia transizione Barba SOLO se la sezione di successo esiste
+          console.log("✅ Form inviato con successo → barba.go()");
+          if (window.barba) barba.go("/");
+        }
+      }, 1200); // tempo di sicurezza
+    });
+  });
+}
+
+/** Reinizializza Webflow dopo transizioni Barba */
+function resetWebflow(data) {
+  if (typeof window.Webflow === "undefined") return;
+
+  try {
+    // Aggiorna ID pagina Webflow
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(data.next.html, "text/html");
+    const webflowPageId = doc.querySelector("html")?.getAttribute("data-wf-page");
+    if (webflowPageId) {
+      document.documentElement.setAttribute("data-wf-page", webflowPageId);
+    }
+
+    // Distruggi e reinizializza Webflow
+    window.Webflow.destroy?.();
+
+    setTimeout(() => {
+      try {
+        window.Webflow.ready?.();
+
+        // 🔹 Reinizializza IX2 (interazioni)
+        const ix2 = window.Webflow.require?.("ix2");
+        if (ix2 && typeof ix2.init === "function") {
+          ix2.init();
+          console.log("✅ Webflow IX2 reinitialized");
+        } else {
+          console.log("⚠️ Webflow IX2 non disponibile, salto init");
+        }
+
+        // 🔹 Reinizializza Forms se serve (per sicurezza nei submit)
+        const forms = window.Webflow.require?.("forms");
+        if (forms && typeof forms.ready === "function") {
+          forms.ready();
+          console.log("✅ Webflow Forms reinitialized");
+        }
+
+        window.Webflow.redraw?.up?.();
+      } catch (innerErr) {
+        console.warn("⚠️ Errore durante il reset Webflow:", innerErr);
+      }
+    }, 100); // leggero delay per sicurezza
+
+    // Ripristina classi w--current
+    document.querySelectorAll(".w--current").forEach(el => el.classList.remove("w--current"));
+    document.querySelectorAll("a").forEach(link => {
+      if (link.getAttribute("href") === window.location.pathname) {
+        link.classList.add("w--current");
+      }
+    });
+
+    console.log("🔁 Webflow reset completato");
+  } catch (err) {
+    console.warn("⚠️ Errore nella reinizializzazione di Webflow:", err);
+  }
+}
