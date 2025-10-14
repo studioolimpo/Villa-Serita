@@ -273,7 +273,7 @@ function initMenu() {
   const nav = document.querySelector(".nav_component");
   if (!navWrap || !nav) return;
 
-  let savedTheme = nav.getAttribute("data-theme") || "dark";
+  let savedTheme = nav.getAttribute("data-theme") || startTheme;
 
 
   // Funzione helper per cambiare tema, evitando conflitti di tween sul nav
@@ -299,7 +299,7 @@ function initMenu() {
       setTheme("light", true);
       console.log("🌞 Menu aperto → Navbar light (savedTheme:", savedTheme, ")");
     } else {
-      const restore = savedTheme || "dark";
+      const restore = savedTheme || startTheme;
       setTheme(restore, true, 0.3); // delay reale 1.5s
       console.log(`🌙 Menu chiuso → ripristino navbar "${restore}" tra 0.3s`);
       savedTheme = null; // reset per prossimo ciclo
@@ -665,6 +665,73 @@ function initSectionReveal(scope = document) {
 // =====================================================
 // NAVBAR THEME HANDLER — based on Lumos Theme Collector
 // =====================================================
+
+/**
+ * Ritorna il tema di partenza per il namespace
+ */
+function getStartThemeForNs(namespace = "home") {
+  const navbarConfig = {
+    home: { startTheme: "dark" },
+    villa: { startTheme: "dark" },
+    matrimoni: { startTheme: "dark" },
+    eventi: { startTheme: "dark" },
+    ristorante: { startTheme: "dark" },
+    esperienze: { startTheme: "dark" },
+    contatti: { startTheme: "light" },
+  };
+  return (navbarConfig[namespace]?.startTheme) || "dark";
+}
+
+// Applica il tema iniziale della navbar senza animazioni, in modo soft (senza killTweens)
+function applyNavbarStartTheme(namespace = "home") {
+  const nav = document.querySelector(".nav_component");
+  if (!nav || !window.colorThemes || !window.colorThemes.getTheme) return;
+
+  const startTheme = getStartThemeForNs(namespace);
+  const vars = colorThemes.getTheme(startTheme);
+
+  // 🔹 Applica il tema iniziale senza animazioni
+  gsap.set(nav, vars);
+  nav.setAttribute("data-theme", startTheme);
+
+  // 🔹 Gestisce anche la background
+  gsap.set(".nav_background", {
+    autoAlpha: startTheme === "light" ? 1 : 0,
+  });
+
+  console.log(`🌙 Navbar soft-set al tema iniziale "${startTheme}"`);
+}
+
+/**
+ * Forza IMMEDIATAMENTE il tema navbar senza animazioni, uccidendo tweens
+ * e impostando lo stato della background per prevenire flash.
+ */
+function forceNavbarThemeImmediate(theme = "dark") {
+  const nav = document.querySelector(".nav_component");
+  if (!nav) return;
+
+  // evita transizioni residue
+  gsap.killTweensOf(nav);
+  gsap.killTweensOf(".nav_background");
+
+  try {
+    if (window.colorThemes && typeof window.colorThemes.getTheme === "function") {
+      const vars = colorThemes.getTheme(theme);
+      if (vars && typeof vars === "object") {
+        gsap.set(nav, { ...vars, overwrite: "auto" });
+      }
+    }
+  } catch {}
+
+  nav.setAttribute("data-theme", theme);
+
+  // background nav in sync con il tema
+  gsap.set(".nav_background", {
+    autoAlpha: theme === "light" ? 1 : 0,
+    overwrite: "auto"
+  });
+}
+
 function setNavbarThemeInitial(namespace = "home") {
   const navbarConfig = {
     home: { startTheme: "dark" },
@@ -765,6 +832,13 @@ function initHideNavbarOnScroll(threshold = 80) {
   let lastScroll = 0;
   let ticking = false;
   let isHidden = false;
+
+
+  // ✅ Timeline iniziale per forzare la navbar visibile
+  const tlInit = gsap.timeline({ defaults: { ease: "power3.out", duration: 0.6 } });
+  tlInit.set(nav, { yPercent: -100, autoAlpha: 0 }); // assicura posizione iniziale coerente
+  tlInit.to(nav, { yPercent: 0, autoAlpha: 1 });     // transizione dolce in ingresso
+  isHidden = false;
 
   // Mostra la navbar
   const showNav = () => {
@@ -1602,9 +1676,6 @@ function initLoader(opts = {}) {
   if (logo) {
     tl.to(logo, { autoAlpha: 1, y: 0, duration: 1.4, ease: easeOut2 }, 0);
   }
-  // if (letters.length) {
-  //   tl.to(letters, { yPercent: 0, duration: 0.7, ease: easeLetters, stagger: 0.15, autoForce3D: true }, "<0.2");
-  // }
 
   if (texts.length) {
     tl.to(texts, { autoAlpha: 1, y: 0, duration: 1.4, ease: easeOut2 }, "<0.6");
@@ -1646,7 +1717,7 @@ function initLoader(opts = {}) {
     );
     tl.to(
       starEl,
-      { rotation: 380, duration: 1.5, ease: "spinStar", transformOrigin: "center center", autoForce3D: true },
+      { rotation: 380, duration: 1.5, ease: "spinStar", transformOrigin: "center center"},
       "<0.4"
     );
   }
@@ -1831,12 +1902,19 @@ barba.init({
 once: async ({ next }) => {
   const scope = next?.container || document;
 
+  // 🔹 Determina subito il namespace e aggiorna immediatamente la navbar (tema + stato corrente)
+  const ns = next?.container?.dataset?.barbaNamespace || "home";
+  applyNavbarStartTheme(ns);
+  const startTheme = getStartThemeForNs(ns);
+  forceNavbarThemeImmediate(startTheme);
+  updateCurrentNav(ns);
+
   // 1) Lenis prima di tutto (e poi lo stoppi per il loader)
   initLenis();
   try { window.lenis?.stop(); } catch {}
 
-  // 2) Ora è sicuro creare i trigger
-  initMenu();
+  // 2) Ora è sicuro creare i trigger e le inizializzazioni globali
+  initMenu(startTheme);
   initSectionReveal(scope);
   initGlobalParallax(scope);
   initGlobalSlider(scope);
@@ -1847,20 +1925,17 @@ once: async ({ next }) => {
   preventSamePageClicks();
   initFormSuccessTransition();
 
-  if (next?.container?.dataset?.barbaNamespace === "matrimoni") {
+  if (ns === "matrimoni") {
     initSliderReview(next.container);
   }
-  // In once
+
+  // 🔹 Inizializza i trigger tema-navbar dopo un leggero delay per evitare marker al top
   gsap.delayedCall(0.1, () => {
-  const ns = next?.container?.dataset?.barbaNamespace || "home";
-  setNavbarThemeInitial(ns);
-  initNavbarThemeScroll(ns);
+    applyNavbarStartTheme(ns);
+    initNavbarThemeScroll(ns);
   });
 
-  updateCurrentNav(next?.container?.dataset?.barbaNamespace);
-
   // 3) Prepara hero ma in pausa
-  const ns = next?.container?.getAttribute('data-barba-namespace') || 'home';
   const heroTl = buildHeroForNamespace(ns, scope);
   if (heroTl) heroTl.pause(0);
 
@@ -1870,10 +1945,13 @@ once: async ({ next }) => {
     }
   });
 
-  await loaderDone;
-
-  // 4) Refresh dopo hero/loader
+  // 🔹 Riallineamento navbar immediato PRIMA del termine del loader
+  forceNavbarThemeImmediate(startTheme);
+  updateCurrentNav(ns);
+  initNavbarThemeScroll(ns);
   refreshScrollTrigger(0.3);
+
+  await loaderDone;
 },
 
       /* Uscita pagina corrente */
@@ -1932,7 +2010,7 @@ once: async ({ next }) => {
           .fromTo(
               starTopEl,
               { rotation: 0 },
-              { rotation: 380, duration: 1.5, ease: 'spinStar', transformOrigin: 'center center', autoForce3D: true },
+              { rotation: 380, duration: 1.5, ease: 'spinStar', transformOrigin: 'center center'},
               0
           )
           // cleanup completo dopo il sipario
@@ -1979,7 +2057,7 @@ once: async ({ next }) => {
     targetId === "transition-contact" ||
     targetId === "transition-newsletter"
   ) {
-    nextDelay = 4;
+    nextDelay = 3;
   }
 
   const tl = gsap.timeline({ defaults: { ease: "loader", duration: 1.2 } })
@@ -1989,7 +2067,7 @@ once: async ({ next }) => {
     .fromTo(
       starBottomEl,
       { rotation: 0 },
-      { rotation: 360, duration: 1.3, ease: 'spinStar', transformOrigin: 'center center', autoForce3D: true },
+      { rotation: 360, duration: 1.3, ease: 'spinStar', transformOrigin: 'center center'},
     )
     .from(data.next.container, { y: "15vh", delay: nextDelay }, "<0.2")
     .to(wrap, { yPercent: -100 }, "<")
@@ -2116,9 +2194,12 @@ barba.hooks.beforeEnter((data) => {
 
   // 🔹 Aggiorna subito navbar (tema + attivo)
   if (nextNs) {
-  setNavbarThemeInitial(nextNs);
-  updateCurrentNav(nextNs);
+    const startTheme = getStartThemeForNs(nextNs);
+    forceNavbarThemeImmediate(startTheme);
+    updateCurrentNav(nextNs);
   }
+
+  initHideNavbarOnScroll(50);
 
   // 🔹 Disattiva temporaneamente tutti gli ScrollTrigger
   disableScrollTriggers();
@@ -2142,7 +2223,7 @@ barba.hooks.afterEnter((data) => {
 
   // 🔹 Inizializza moduli di base
   initFormSuccessTransition();
-  initHideNavbarOnScroll(60);
+  
 
   // 🔹 Riattiva gli ScrollTrigger globali
   enableScrollTriggers();
