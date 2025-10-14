@@ -261,153 +261,195 @@ function pauseAndResetVideos(scope = document) {
 
 
 
+
+
 /***********************
- * NAV MENU
+ * MENU HANDLER
  ***********************/
 function initMenu() {
-    
-    gsap.defaults({
-      ease: "main",
-      duration: 0.7
+  gsap.defaults({ ease: "main", duration: 0.7 });
+
+  const navWrap = document.querySelector(".nav_menu_wrap");
+  const nav = document.querySelector(".nav_component");
+  if (!navWrap || !nav) return;
+
+  let savedTheme = nav.getAttribute("data-theme") || "dark";
+
+
+  // Funzione helper per cambiare tema, evitando conflitti di tween sul nav
+  const setTheme = (theme, animate = true, delay = 0) => {
+    if (!window.colorThemes) return;
+    const vars = colorThemes.getTheme(theme);
+    if (!vars) return;
+    // Evita conflitti di tween sul nav
+    gsap.killTweensOf(nav);
+    const action = animate ? gsap.to : gsap.set;
+    action(nav, { ...vars, duration: 0.5, ease: "power2.inOut", delay, overwrite: "auto" });
+    nav.setAttribute("data-theme", theme);
+  };
+
+  // Aggiorna il tema in base allo stato del menu (salva/ripristina robusto, delay reale su chiusura)
+  const handleMenuTheme = (isOpen) => {
+    if (isOpen) {
+      // Salva il tema corrente una sola volta per ciclo (se non è già light)
+      const currentTheme = nav.getAttribute("data-theme") || "dark";
+      if (!savedTheme && currentTheme !== "light") {
+        savedTheme = currentTheme;
+      }
+      setTheme("light", true);
+      console.log("🌞 Menu aperto → Navbar light (savedTheme:", savedTheme, ")");
+    } else {
+      const restore = savedTheme || "dark";
+      setTheme(restore, true, 0.3); // delay reale 1.5s
+      console.log(`🌙 Menu chiuso → ripristino navbar "${restore}" tra 0.3s`);
+      savedTheme = null; // reset per prossimo ciclo
+    }
+  };
+
+  let state = navWrap.getAttribute("data-nav");
+  const overlay = navWrap.querySelector(".nav_menu_overlay");
+  const menu = navWrap.querySelector(".nav_menu_wrapper");
+  const menuLayout = navWrap.querySelector(".nav_menu_layout");
+  const bgPanels = navWrap.querySelectorAll(".nav_menu_panel");
+  const menuToggles = document.querySelectorAll("[data-menu-toggle]");
+  const menuLinks = navWrap.querySelectorAll(".nav_menu_link");
+  const menuLanguage = navWrap.querySelector(".nav_menu_language");
+  const menuButton = document.querySelector(".menu_button_wrap");
+  const menuButtonLayout = menuButton.querySelectorAll(".menu_button_layout");
+  const menuInfo = navWrap.querySelector(".nav_menu_content");
+  const navTransition = navWrap.querySelector(".nav_menu_transition");
+  const navMobile = document.querySelector(".nav_mobile_wrap");
+  const tl = gsap.timeline();
+
+  const disableNavbarScrollTriggers = () => {
+    ScrollTrigger.getAll().forEach(st => {
+      if (st.vars.id === "navbar-theme") st.disable();
     });
+  };
 
-    let navWrap = document.querySelector(".nav_menu_wrap");
-    let state = navWrap.getAttribute("data-nav");
-    let overlay = navWrap.querySelector(".nav_menu_overlay");
-    let menu = navWrap.querySelector(".nav_menu_wrapper");
-    let menuLayout = navWrap.querySelector(".nav_menu_layout");
-    let bgPanels = navWrap.querySelectorAll(".nav_menu_panel");
-    let menuToggles = document.querySelectorAll("[data-menu-toggle]");
-    let menuLinks = navWrap.querySelectorAll(".nav_menu_link");
-    let menuLanguage = navWrap.querySelector(".nav_menu_language");
-    let menuButton = document.querySelector(".menu_button_wrap");
-    let menuButtonLayout = menuButton.querySelectorAll(".menu_button_layout");
-    // let menuDivider = navWrap.querySelectorAll(".nav_menu_divider");
-    let menuInfo = navWrap.querySelector(".nav_menu_content");
-    let navTransition = navWrap.querySelector(".nav_menu_transition");
+  const enableNavbarScrollTriggers = () => {
+    ScrollTrigger.getAll().forEach(st => {
+      if (st.vars.id === "navbar-theme") st.enable();
+    });
+  };
 
-    let tl = gsap.timeline();
+  const openNav = () => {
+    try { lenis.stop(); } catch {}
+    navWrap.setAttribute("data-nav", "open");
+    tl.clear();
+    // Debug group
+    console.groupCollapsed("[MENU]", (isOpen => isOpen ? "OPEN" : "CLOSE")(navWrap.getAttribute("data-nav") === "open"));
+    console.debug("savedTheme:", savedTheme, "data-theme now:", nav.getAttribute("data-theme"));
+    console.groupEnd();
+    handleMenuTheme(true);
+    disableNavbarScrollTriggers();
 
-    const openNav = () => {
-      navWrap.setAttribute("data-nav", "open");
-      tl.clear()
-        .set(navWrap, { display: "block" })
-        .set(menuLanguage, { autoAlpha: 0, yPercent: 5 }, "<")
-        .set(menuInfo, { autoAlpha: 0, yPercent: 5 }, "<")
-        .set(menu, { yPercent: 0 }, "<")
-        .set(menuLayout, { opacity: 1 }, "<")
-        .set(navTransition, { autoAlpha: 0 }, "<")
-        .fromTo(menuButtonLayout, { yPercent: 0 }, { yPercent: -120, duration: 0.7, ease: "power3.out"}, "<")
-        .fromTo(overlay, { autoAlpha: 0 }, { autoAlpha: 1, duration: 1 }, "<")
-        .fromTo(bgPanels, { yPercent: -101 }, { yPercent: 0, duration: 1.2, ease:"bgPanelEase"  }, "<");
-      // Always re-select main to ensure it's fresh after Barba transitions
-      let main = document.querySelector('[data-barba="container"]');
-      tl.fromTo(main, {yPercent: 0},{yPercent: 2, duration: 1.2, ease: "bgPanelEase" },"<")
-        .fromTo(menuLanguage, { yPercent: 20, autoAlpha: 0 }, { yPercent: 0, autoAlpha:1 }, "<0.3")
-        .fromTo(menuLinks, { autoAlpha: 0, yPercent: 5 }, { autoAlpha: 1, yPercent: 0, duration: 1.2, stagger: 0.09 }, "<0.1")
-        .fromTo(menuInfo, { yPercent: 5, autoAlpha: 0 }, { yPercent: 0, autoAlpha: 1 }, "<0.4");
+    // 🔹 Disattiva temporaneamente tutti gli ScrollTrigger per evitare sfasamenti
+    const allTriggers = ScrollTrigger.getAll();
+    allTriggers.forEach(t => t.disable(false));
 
-    };
+    tl
+      .set(navWrap, { display: "block" })
+      .set(menuLanguage, { autoAlpha: 0, yPercent: 5 })
+      .set(menuInfo, { autoAlpha: 0, yPercent: 5 })
+      .set(menu, { yPercent: 0 })
+      .set(menuLayout, { opacity: 1 })
+      .set(navTransition, { autoAlpha: 0 })
+      .fromTo(menuButtonLayout, { yPercent: 0 }, { yPercent: -120, duration: 0.7, ease: "power3.out" }, "<")
+      .fromTo(overlay, { autoAlpha: 0 }, { autoAlpha: 1, duration: 1 }, "<")
+      .fromTo(bgPanels, { yPercent: -101 }, { yPercent: 0, duration: 1.2, ease: "bgPanelEase" }, "<");
 
-    const closeNav = () => {
-      navWrap.setAttribute("data-nav", "closed");
-      tl.clear();
-
-      const main = document.querySelector('[data-barba="container"]');
-
-      tl.to(overlay, { autoAlpha: 0 })
-        .to(menuLayout, { opacity: 0, yPercent: 5, duration: 1, ease:"power2.out" }, 0)
-        .to(main, { yPercent: 0, duration: 1.2, ease: "bgPanelEase" }, "<")
-        .to(menu, { yPercent: -110, duration: 1, ease: "bgPanelEase" }, "<")
-        .to(menuButtonLayout, { yPercent: 0 }, "<")
-        .set(navWrap, { display: "none" });
-    };
-
-    const transitionNav = () => {
-        navWrap.setAttribute("data-nav", "closed");
-        tl.clear()
-          .to(overlay, { autoAlpha: 0, delay: 0.1 })
-          //.to(navTransition, { autoAlpha: 1, duration: 0.5 }, "<")
-          .to(menu, { yPercent: -110, duration: 1.2 , ease: "power2.in" }, "<0.2")
-          .to(menuButtonLayout, { yPercent: 0, duration: 1, ease: "bgPanelEase" }, "<0.2")
-          .set(navWrap, { display: "none" });
-        // Always re-select main to ensure it's fresh after Barba transitions
-        let main = document.querySelector('[data-barba="container"]');
-        tl.to(main, { y: 0, duration: 0.6 }, "<");
-
-        window.__navJustClosed__ = true;
-      };
-
-    menuToggles.forEach((toggle) => {
-      toggle.addEventListener("click", () => {
-        state = navWrap.getAttribute("data-nav");
-        if (state === "open") {
-          closeNav();
-          lenis.start();
-        } else {
-          openNav();
-          lenis.stop();
-        }
+    // Mantieni animazione originale del container principale
+    const main = document.querySelector('[data-barba="container"]');
+    tl.fromTo(main, { yPercent: 0 }, { yPercent: 2, duration: 1.2, ease: "bgPanelEase" }, "<")
+      .fromTo(menuLanguage, { yPercent: 20, autoAlpha: 0 }, { yPercent: 0, autoAlpha: 1 }, "<0.3")
+      .fromTo(menuLinks, { autoAlpha: 0, yPercent: 5 }, { autoAlpha: 1, yPercent: 0, duration: 1.2, stagger: 0.09 }, "<0.1")
+      .fromTo(menuInfo, { yPercent: 5, autoAlpha: 0 }, { yPercent: 0, autoAlpha: 1 }, "<0.4")
+      // 🔹 Riattiva i trigger e riallinea i marker dopo l'apertura del menu
+      .call(() => {
+        const allTriggers = ScrollTrigger.getAll();
+        allTriggers.forEach(t => t.enable(false));
+        ScrollTrigger.refresh(true);
+        console.log("🔁 ScrollTrigger refresh after menu open");
       });
-    });
+  }
 
-    $("a").on("click", function (e) {
-      const href = $(this).attr("href");
-      const isSameHost = $(this).prop("hostname") === window.location.host;
-      const isNotHash = href.indexOf("#") === -1;
-      const isNotBlank = $(this).attr("target") !== "_blank";
-      const isNavOpen = navWrap.getAttribute("data-nav") === "open";
-      const isLangSwitcher = $(this).closest(".footer_switcher_wrapper").length > 0;
+  const closeNav = () => {
+    navWrap.setAttribute("data-nav", "closed");
+    tl.clear();
+    // Debug group
+    console.groupCollapsed("[MENU]", (isOpen => isOpen ? "OPEN" : "CLOSE")(navWrap.getAttribute("data-nav") === "open"));
+    console.debug("savedTheme:", savedTheme, "data-theme now:", nav.getAttribute("data-theme"));
+    console.groupEnd();
+    handleMenuTheme(false);
+    enableNavbarScrollTriggers();
 
-      const currentPath = window.location.pathname.replace(/\/$/, "");
-      const targetPath = new URL(href, window.location.origin).pathname.replace(/\/$/, "");
+    const main = document.querySelector('[data-barba="container"]');
+    tl.to(overlay, { autoAlpha: 0 })
+      .to(menuLayout, { opacity: 0, yPercent: 5, duration: 1, ease: "power2.out" }, 0)
+      .to(main, { yPercent: 0, duration: 1.2, ease: "bgPanelEase" }, "<")
+      .to(menu, { yPercent: -110, duration: 1, ease: "bgPanelEase" }, "<")
+      .to(menuButtonLayout, { yPercent: 0 }, "<")
+      .set(navWrap, { display: "none" })
+      .call(() => {
+        try { lenis.start(); } catch {}
+      });
 
-      if (isSameHost && isNotHash && isNotBlank && isNavOpen && !isLangSwitcher) {
-        if (currentPath === targetPath) {
-          e.preventDefault();
-          closeNav();
-          lenis.start();
-        } else {
-          e.preventDefault();
-          transitionNav();
-          lenis.start();
-        }
+    // 🔄 Refresh ScrollTrigger dopo la chiusura del menu per riallineare i marker
+    gsap.delayedCall(0.8, () => {
+      try {
+        if (window.lenis) window.lenis.raf(performance.now());
+        ScrollTrigger.refresh(true);
+        console.log("✅ ScrollTrigger refresh after menu close");
+      } catch (err) {
+        console.warn("⚠️ Refresh fallito:", err);
       }
     });
+    // navMobile?.classList.remove("u-theme-light");
+  };
 
-// if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
-//     const listItems = navWrap.querySelectorAll(".nav_menu_link");
-//     const imageItems = document.querySelectorAll(".nav_visual_item");
+  const transitionNav = () => {
+    navWrap.setAttribute("data-nav", "closed");
+    tl.clear()
+      .to(overlay, { autoAlpha: 0, delay: 0.1 })
+      .to(menu, { yPercent: -110, duration: 1.2, ease: "power2.in" }, "<0.2")
+      .to(menuButtonLayout, { yPercent: 0, duration: 1, ease: "bgPanelEase" }, "<0.2")
+      .set(navWrap, { display: "none" });
+    const main = document.querySelector('[data-barba="container"]');
+    tl.to(main, { y: 0, duration: 0.6 }, "<");
+    window.__navJustClosed__ = true;
+  };
 
-//     if (listItems.length && imageItems.length) {
-//       gsap.set(imageItems, { autoAlpha: 0 });
+  menuToggles.forEach(toggle => {
+    toggle.addEventListener("click", () => {
+      const isOpen = navWrap.getAttribute("data-nav") === "open";
+      if (isOpen) closeNav();
+      else openNav();
+    });
+  });
 
-//       listItems.forEach((listItem, i) => {
-//         listItem.addEventListener("mouseenter", () => {
-//           imageItems.forEach((img, index) => {
-//             gsap.killTweensOf(img);
-//             gsap.to(img, {
-//               autoAlpha: index === i ? 1 : 0,
-//               duration: 0.5,
-//               overwrite: true
-//             });
-//           });
-//         });
+  $("a").on("click", function (e) {
+    const href = $(this).attr("href");
+    const isSameHost = $(this).prop("hostname") === window.location.host;
+    const isNotHash = href.indexOf("#") === -1;
+    const isNotBlank = $(this).attr("target") !== "_blank";
+    const isNavOpen = navWrap.getAttribute("data-nav") === "open";
+    const isLangSwitcher = $(this).closest(".footer_switcher_wrapper").length > 0;
 
-//         listItem.addEventListener("mouseleave", () => {
-//           imageItems.forEach((img) => {
-//             gsap.killTweensOf(img);
-//             gsap.to(img, {
-//               autoAlpha: 0,
-//               duration: 0.3,
-//               overwrite: true
-//             });
-//           });
-//         });
-//       });
-//     }
-//   }
+    const currentPath = window.location.pathname.replace(/\/$/, "");
+    const targetPath = new URL(href, window.location.origin).pathname.replace(/\/$/, "");
+
+    if (isSameHost && isNotHash && isNotBlank && isNavOpen && !isLangSwitcher) {
+      e.preventDefault();
+      if (currentPath === targetPath) {
+        closeNav();
+      } else {
+        transitionNav();
+      }
+    }
+  });
 }
+
 
 
 
@@ -560,7 +602,7 @@ function initSectionReveal(scope = document) {
       ease: "power3.out",
       scrollTrigger: {
         trigger: el,
-        markers: true,
+        // markers: true,
         start: "top bottom",
         end: "top 85%",
         toggleActions: "none play none reset",
@@ -575,44 +617,44 @@ function initSectionReveal(scope = document) {
  * ANIMATE THEME ON SCROLL
  * Seleziona gli elementi con data-reveal="scroll"
  ***********************/
-function initAnimateThemeScroll(scope = document) {
-  const root = scope instanceof Element ? scope : document;
+// function initAnimateThemeScroll(scope = document) {
+//   const root = scope instanceof Element ? scope : document;
 
-  root.querySelectorAll("[data-animate-theme-to]").forEach((el) => {
-    const theme = el.getAttribute("data-animate-theme-to");
-    const brand = el.getAttribute("data-animate-brand-to");
+//   root.querySelectorAll("[data-animate-theme-to]").forEach((el) => {
+//     const theme = el.getAttribute("data-animate-theme-to");
+//     const brand = el.getAttribute("data-animate-brand-to");
 
-    ScrollTrigger.create({
-      trigger: el,
-      start: "top center",
-      end:   "bottom center",
-      onToggle: ({ isActive }) => {
-        if (isActive && window.colorThemes && typeof window.colorThemes.getTheme === "function") {
-          gsap.to("body", { ...colorThemes.getTheme(theme, brand) });
-        }
-      }
-    });
-  });
-}
+//     ScrollTrigger.create({
+//       trigger: el,
+//       start: "top center",
+//       end:   "bottom center",
+//       onToggle: ({ isActive }) => {
+//         if (isActive && window.colorThemes && typeof window.colorThemes.getTheme === "function") {
+//           gsap.to("body", { ...colorThemes.getTheme(theme, brand) });
+//         }
+//       }
+//     });
+//   });
+// }
 
 /***********************
  * THEME RESET → LIGHT
  ***********************/
-function resetThemeToLight(opts = {}) {
-  const {
-    brand = "default",
-    duration = 0.6,
-    ease = "power2.out"
-  } = opts;
+// function resetThemeToLight(opts = {}) {
+//   const {
+//     brand = "default",
+//     duration = 0.6,
+//     ease = "power2.out"
+//   } = opts;
 
-  // se non c’è colorThemes o getTheme, esco silenziosamente
-  if (!window.colorThemes || typeof window.colorThemes.getTheme !== "function") return;
+//   // se non c’è colorThemes o getTheme, esco silenziosamente
+//   if (!window.colorThemes || typeof window.colorThemes.getTheme !== "function") return;
 
-  const vars = window.colorThemes.getTheme("light", brand);
-  if (!vars || typeof vars !== "object") return;
+//   const vars = window.colorThemes.getTheme("light", brand);
+//   if (!vars || typeof vars !== "object") return;
 
-  gsap.to("body", { ...vars, duration, ease, overwrite: "auto" });
-}
+//   gsap.to("body", { ...vars, duration, ease, overwrite: "auto" });
+// }
 
 
 
@@ -620,70 +662,98 @@ function resetThemeToLight(opts = {}) {
  * NAVBAR THEME HANDLER
  * Gestisce il cambio tema della navbar (dark → light) in base al namespace
  ***********************/
-const navbarThemeTriggers = {
-  home: { startTheme: "dark", trigger: "#section-hero" },
-  villa: { startTheme: "dark", trigger: "#section-hero" },
-  matrimoni: { startTheme: "dark", trigger: "#section-hero" },
-  eventi: { startTheme: "dark", trigger: "#section-hero" },
-  ristorante: { startTheme: "dark", trigger: "#section-hero" },
-  esperienze: { startTheme: "dark", trigger: "#section-hero" },
-};
+// =====================================================
+// NAVBAR THEME HANDLER — based on Lumos Theme Collector
+// =====================================================
+function setNavbarThemeInitial(namespace = "home") {
+  const navbarConfig = {
+    home: { startTheme: "dark" },
+    villa: { startTheme: "dark" },
+    matrimoni: { startTheme: "dark" },
+    eventi: { startTheme: "dark" },
+    ristorante: { startTheme: "dark" },
+    esperienze: { startTheme: "dark" },
+    contatti: { startTheme: "light" },
+  };
 
-function initNavbarTheme(namespace, retryCount = 0) {
-  // Pulizia base
+  const { startTheme = "dark" } = navbarConfig[namespace] || {};
+  const nav = document.querySelector(".nav_component");
+  if (!nav) return;
+
+  try {
+    const vars = colorThemes.getTheme(startTheme);
+    if (vars && typeof vars === "object") gsap.set(nav, { ...vars });
+    nav.setAttribute("data-theme", startTheme);
+  } catch (e) {
+    console.warn("Navbar initial theme error:", e);
+  }
+}
+
+function initNavbarThemeScroll(namespace = "home") {
+  const navbarConfig = {
+    home: { startTheme: "dark", trigger: "#section-hero" },
+    villa: { startTheme: "dark", trigger: "#section-hero" },
+    matrimoni: { startTheme: "dark", trigger: "#section-hero" },
+    eventi: { startTheme: "dark", trigger: "#section-hero" },
+    ristorante: { startTheme: "dark", trigger: "#section-hero" },
+    esperienze: { startTheme: "dark", trigger: "#section-hero" },
+    contatti: { startTheme: "light" },
+  };
+
+  // pulizia vecchi trigger
   try {
     ScrollTrigger.getAll().forEach(st => {
       if (st.vars.id === "navbar-theme") st.kill();
     });
-    ScrollTrigger.clearMatchMedia();
   } catch (err) {
-    console.warn("⚠️ Errore durante la pulizia ScrollTrigger:", err);
+    console.warn("Errore pulizia ScrollTrigger:", err);
   }
 
-  // Attesa colorThemes
-  if (!window.colorThemes || typeof window.colorThemes.getTheme !== "function") {
-    if (retryCount < 20) {
-      gsap.delayedCall(0.1, () => initNavbarTheme(namespace, retryCount + 1));
-    }
-    return;
-  }
+  const { startTheme = "dark", trigger = "#section-hero" } = navbarConfig[namespace] || {};
+  if (startTheme === "light") return;
 
-  const config = navbarThemeTriggers[namespace];
-  if (!config) {
-    gsap.to(".nav_component", { ...colorThemes.getTheme("light"), duration: 0.6, ease: "power2.out" });
-    return;
-  }
+  const nav = document.querySelector(".nav_component");
+  const triggerEl = document.querySelector(trigger);
+  if (!nav || !triggerEl) return;
 
-  // Imposta tema iniziale dark
-  gsap.set(".nav_component", { ...colorThemes.getTheme(config.startTheme) });
+  ScrollTrigger.create({
+    id: "navbar-theme",
+    trigger: triggerEl,
+    start: "bottom top",
+    end: "bottom top",
+    // markers: { startColor: "orange", endColor: "orange", fontSize: "10px" },
+    onEnter: () => {
+      gsap.to(nav, { ...colorThemes.getTheme("light"), ease: "power2.inOut", duration: 0.3 });
+      nav.setAttribute("data-theme", "light");
 
-  // Delay per aspettare il layout stabile (hero render + immagini)
-  gsap.delayedCall(0.6, () => {
-    const triggerEl = document.querySelector(config.trigger);
-    if (!triggerEl) {
-      console.warn("⚠️ Trigger hero non trovato:", config.trigger);
-      return;
-    }
 
-    // Crea il nuovo ScrollTrigger
-    ScrollTrigger.create({
-      id: "navbar-theme",
-      trigger: triggerEl,
-      start: "bottom top",
-      end: "bottom+=1 top",
-      onEnter: () => {
-        gsap.to(".nav_component", { ...colorThemes.getTheme("light"), duration: 0.5, ease: "power3.out" });
-      },
-      onLeaveBack: () => {
-        gsap.to(".nav_component", { ...colorThemes.getTheme(config.startTheme), duration: 0.5, ease: "power3.out" });
-      },
-      markers: false
-    });
+      // 🔹 Fade-in background nav
+      gsap.to(".nav_background", {
+        autoAlpha: 1,
+        duration: 0.3,
+        ease: "power2.inOut",
+        overwrite: "auto"
+      });
 
-    // Rinfresca calcoli di posizione dopo creazione
-    gsap.delayedCall(0.2, () => ScrollTrigger.refresh());
+    },
+    onLeaveBack: () => {
+      gsap.to(nav, { ...colorThemes.getTheme(startTheme), ease: "power2.inOut", duration: 0.3 });
+      nav.setAttribute("data-theme", startTheme);
+
+
+      // 🔹 Fade-out background nav
+      gsap.to(".nav_background", {
+        autoAlpha: 0,
+        duration: 0.3,
+        ease: "power2.inOut",
+        overwrite: "auto"
+      });
+
+    },
   });
 }
+
+
 
 /***********************
  * HIDE / SHOW NAVBAR ON SCROLL
@@ -1012,59 +1082,167 @@ function preventSamePageClicks() {
 
 
 /***********************
- * FORM SUCCESS → MODAL-BASED BARBA TRANSITION
+ * FORM SUCCESS → Trigger Barba con pannello personalizzato
  ***********************/
-// Nuova funzione: initFormSuccessTransition con supporto per transizioni custom
 function initFormSuccessTransition() {
-  const forms = document.querySelectorAll("form");
+  if (window.__wfFormSuccessBound) return;
+  window.__wfFormSuccessBound = true;
 
-  forms.forEach((form) => {
-    form.addEventListener("submit", function (e) {
-      // Intercetta solo se Webflow ha completato correttamente l'invio
-      $(document).one("ajaxComplete", function () {
-        // Evita doppi trigger
-        $(document).off("ajaxComplete");
+  // 🔹 Registro form → pannello di transizione
+  const FORM_TRANSITION_REGISTRY = {
+    "Form Contatti": "#transition-contact",
+    "Form Newsletter": "#transition-newsletter",
+    "Form Matrimoni": "#transition-contact",
+    "Form Eventi Privati": "#transition-contact",
+  };
 
-        // Disabilita temporaneamente l'evento per evitare loop dopo la transizione
-        window.__formJustSubmitted = true;
+  // Ascolta completamento AJAX di Webflow
+  $(document).on("ajaxComplete", function (event, xhr, settings) {
+    // Cerca un form che ha ricevuto la classe di successo
+    const $doneForms = $(".w-form-done").closest("form");
+    if (!$doneForms.length) return;
 
-        // Determina il tipo di transizione da usare
-        const formName = form.getAttribute("name") || "";
-        let transitionId = "#transition-default";
-        if (formName.includes("Contatti") || formName.includes("Eventi") || formName.includes("Matrimoni")) {
-          transitionId = "#transition-contact";
+    $doneForms.each(function () {
+      const form = this;
+      const formName = form.getAttribute("name") || "Form generico";
+      console.log("✅ Form completato:", formName);
+
+      // Previeni doppi trigger
+      if (form.__barbaHandled) return;
+      form.__barbaHandled = true;
+
+      const target = FORM_TRANSITION_REGISTRY[formName] || ".transition_wrap";
+      window.__formJustSubmitted = true;
+      window.__barbaTransitionTarget = target;
+
+      console.log(`🚀 Avvio transizione Barba → ${target}`);
+
+      // ✳️ Aggiungi un piccolo delay per garantire che Webflow termini davvero l’invio
+      setTimeout(() => {
+        if (window.barba) {
+          barba.go("/");
+        } else {
+          window.location.href = "/";
         }
-
-        const overlay = document.querySelector(transitionId);
-        if (!overlay) return;
-
-        // Blocca il loop: se siamo già sulla home, non richiamiamo barba.go("/")
-        const currentUrl = window.location.pathname.replace(/\/$/, "");
-        if (currentUrl !== "/") {
-          window.__barbaTransitionTarget = transitionId;
-          try {
-            barba.go("/");
-          } catch (e) {
-            console.warn("Barba go failed:", e);
-          }
-        }
-
-        // Dopo la prima esecuzione, resetta il flag
-        setTimeout(() => {
-          window.__formJustSubmitted = false;
-        }, 3000);
-      });
+      }, 500); // mezzo secondo = garantisce che la mail parta prima della transizione
     });
   });
 }
+
+// Hook di sicurezza per Barba
+barba.hooks.before(() => {
+  if (window.__formJustSubmitted) {
+    if (typeof $(document).off === "function") $(document).off("ajaxComplete");
+  }
+});
 
 // E nel tuo hook barba, prima di ogni transizione:
 barba.hooks.before(() => {
   // Se la transizione è appena stata causata da un form, non rilanciarla
   if (window.__formJustSubmitted) {
-    $(document).off("ajaxComplete");
+    if (typeof $(document).off === "function") $(document).off("ajaxComplete");
   }
 });
+
+
+/***********************
+ * ACCORDION COMPONENT — MATRIMONI & EVENTI
+ ***********************/
+function initAccordion(scope = document) {
+  const components = scope.querySelectorAll(".accordion_wrap");
+  if (!components.length) return;
+
+  components.forEach((component, listIndex) => {
+    if (component.dataset.scriptInitialized === "true") return;
+    component.dataset.scriptInitialized = "true";
+
+    const closePrevious = component.getAttribute("data-close-previous") !== "false";
+    const closeOnSecondClick = component.getAttribute("data-close-on-second-click") !== "false";
+    const openOnHover = component.getAttribute("data-open-on-hover") === "true";
+    const openByDefault = component.hasAttribute("data-open-by-default")
+      && !isNaN(+component.getAttribute("data-open-by-default"))
+      ? +component.getAttribute("data-open-by-default")
+      : false;
+
+    const list = component.querySelector(".accordion_list");
+    let previousIndex = null;
+    const closeFunctions = [];
+
+    // Rimuove il wrapper CMS dinamico per poter usare GSAP in modo pulito
+    function removeCMSList(slot) {
+      const dynList = Array.from(slot.children).find((child) => child.classList.contains("w-dyn-list"));
+      if (!dynList) return;
+      const nestedItems = dynList?.firstElementChild?.children;
+      if (!nestedItems) return;
+      const staticWrapper = [...slot.children];
+      [...nestedItems].forEach(el => el.firstElementChild && slot.appendChild(el.firstElementChild));
+      staticWrapper.forEach((el) => el.remove());
+    }
+    if (list) removeCMSList(list);
+
+    component.querySelectorAll(".accordion_component").forEach((card, cardIndex) => {
+      const button = card.querySelector(".accordion_toggle_button");
+      const content = card.querySelector(".accordion_content_wrap");
+      if (!button || !content) return console.warn("Accordion: elementi mancanti", card);
+
+      button.setAttribute("aria-expanded", "false");
+      button.setAttribute("id", `accordion_button_${listIndex}_${cardIndex}`);
+      content.setAttribute("id", `accordion_content_${listIndex}_${cardIndex}`);
+      button.setAttribute("aria-controls", content.id);
+      content.setAttribute("aria-labelledby", button.id);
+      content.style.display = "none";
+
+      const refresh = () => {
+        if (typeof ScrollTrigger !== "undefined") ScrollTrigger.refresh();
+      };
+
+      const tl = gsap.timeline({
+        paused: true,
+        defaults: { duration: 0.5, ease: "power2.inOut" },
+        onComplete: refresh,
+        onReverseComplete: refresh
+      });
+      tl.set(content, { display: "block" });
+      tl.fromTo(content, { height: 0 }, { height: "auto" });
+
+      const closeAccordion = () => {
+        if (card.classList.contains("is-active")) {
+          card.classList.remove("is-active");
+          tl.reverse();
+          button.setAttribute("aria-expanded", "false");
+        }
+      };
+
+      const openAccordion = (instant = false) => {
+        if (closePrevious && previousIndex !== null && previousIndex !== cardIndex) {
+          closeFunctions[previousIndex]?.();
+        }
+        previousIndex = cardIndex;
+        button.setAttribute("aria-expanded", "true");
+        card.classList.add("is-active");
+        instant ? tl.progress(1) : tl.play();
+      };
+
+      closeFunctions[cardIndex] = closeAccordion;
+
+      if (openByDefault === cardIndex + 1) openAccordion(true);
+
+      button.addEventListener("click", () => {
+        const isActive = card.classList.contains("is-active");
+        if (isActive && closeOnSecondClick) {
+          closeAccordion();
+          previousIndex = null;
+        } else {
+          openAccordion();
+        }
+      });
+
+      if (openOnHover) {
+        button.addEventListener("mouseenter", () => openAccordion());
+      }
+    });
+  });
+}
 
 
 
@@ -1193,7 +1371,7 @@ function initHeroVilla(scope = document) {
   return tl;
 }
 
-
+// HERO CONTATTI
 function initHeroContact(scope = document) {
   const section = scope.querySelector('#section-hero');
   if (!section) return null;
@@ -1237,7 +1415,7 @@ function initHeroContact(scope = document) {
 }
 
 
-
+// HERO 
 function initHeroSingleExperience(scope = document) {
   const section = scope.querySelector('#section-hero');
   if (!section) return null;
@@ -1606,7 +1784,7 @@ barba.init({
     {
       name: "default",
       sync: false,
-      // timeout: 8000,
+      //timeout: 8000,
 
         // ONCE — sposta su
 once: async ({ next }) => {
@@ -1621,7 +1799,7 @@ once: async ({ next }) => {
   initSectionReveal(scope);
   initGlobalParallax(scope);
   initGlobalSlider(scope);
-  initAnimateThemeScroll(scope);
+  // initAnimateThemeScroll(scope);
   initCurrentYear(scope);
   initSignature();
   initCustomCursor();
@@ -1632,8 +1810,10 @@ once: async ({ next }) => {
     initSliderReview(next.container);
   }
   // In once
-  gsap.delayedCall(0.3, () => {
-    initNavbarTheme(next.container.dataset.barbaNamespace);
+  gsap.delayedCall(0.1, () => {
+  const ns = next?.container?.dataset?.barbaNamespace || "home";
+  setNavbarThemeInitial(ns);
+  initNavbarThemeScroll(ns);
   });
 
   updateCurrentNav(next?.container?.dataset?.barbaNamespace);
@@ -1745,20 +1925,20 @@ once: async ({ next }) => {
         }
         const starBottomEl = wrap?.querySelector("#spinstarbottom");
 
-        //forceNextPageToTop();
+        // Calcola qui il ritardo d'ingresso del next.container
+        const isCustomTransition = window.__barbaTransitionTarget && window.__barbaTransitionTarget !== ".transition_wrap";
+        const nextDelay = isCustomTransition ? 1.5 : 0.1; // più lento nei form
 
         const tl = gsap.timeline({ defaults: { ease: "loader", duration: 1.2 } })
-      
           .add(() => {
-              if (starBottomEl) gsap.set(starBottomEl, { rotation: 0 });
-            }, 0)
-            .fromTo(
-                starBottomEl,
-                { rotation: 0 },
-                { rotation: 360, duration: 1.3, ease: 'spinStar', transformOrigin: 'center center', autoForce3D: true },
-            )
-          .from(data.next.container, { y: "15vh", delay: 0.1 },"<0.2")
-          
+            if (starBottomEl) gsap.set(starBottomEl, { rotation: 0 });
+          }, 0)
+          .fromTo(
+            starBottomEl,
+            { rotation: 0 },
+            { rotation: 360, duration: 1.3, ease: 'spinStar', transformOrigin: 'center center', autoForce3D: true },
+          )
+          .from(data.next.container, { y: "15vh", delay: nextDelay }, "<0.2")
           .to(wrap, { yPercent: -100 }, "<")
           .set(wrap, { yPercent: 100, display: "none", visibility: "hidden" });
 
@@ -1801,12 +1981,14 @@ once: async ({ next }) => {
       afterEnter({ next }) {
         const scope = next?.container || document;
         initSliderReview(scope);
+        initAccordion(scope);
       },
     },
     {
       namespace: "eventi",
       afterEnter({ next }) {
         const scope = next?.container || document;
+        initAccordion(scope);
       },
     },
     {
@@ -1863,41 +2045,75 @@ function updateCurrentNav(currentNs) {
   }
 }
 
-/* Hook ogni volta che entri in una nuova pagina */
+// ================================
+// BARBA HOOKS ottimizzati
+// ================================
+
+// Disattiva e riattiva gli ScrollTrigger globali
+function disableScrollTriggers() {
+  ScrollTrigger.getAll().forEach(st => st.disable(false));
+}
+function enableScrollTriggers() {
+  ScrollTrigger.getAll().forEach(st => st.enable(false));
+}
+
 barba.hooks.beforeEnter((data) => {
   const scope = data?.next?.container || document;
+  const nextNs = data?.next?.container?.dataset?.barbaNamespace;
 
+  // 🔹 Aggiorna subito navbar (tema + attivo)
+  if (nextNs) {
+  setNavbarThemeInitial(nextNs);
+  updateCurrentNav(nextNs);
+  }
+
+  // 🔹 Disattiva temporaneamente tutti gli ScrollTrigger
+  disableScrollTriggers();
+
+  // 🔹 Inizializzazioni globali
   initAutoPlayVideos(scope);
   initLenis();
-
-  resetThemeToLight();
-
   initSectionReveal(scope);
   initGlobalParallax(scope);
   initGlobalSlider(scope);
-  initAnimateThemeScroll(scope);
-
   forceNextPageToTop();
-
-  
-
-  // Aggiorna la navbar corrente in base al namespace della prossima pagina
-  const nextNs = data?.next?.container?.dataset?.barbaNamespace;
-  if (nextNs) updateCurrentNav(nextNs);
-});
-
-/* Hook eventuali integrazioni post-swap */
-barba.hooks.after((data) => {
-  if (typeof resetWebflow === "function") resetWebflow(data);
-  const scope = data?.next?.container || document;
-  initCurrentYear(scope);
 });
 
 barba.hooks.afterEnter((data) => {
-  gsap.delayedCall(0.5, () => {
-    initNavbarTheme(data.next.container.dataset.barbaNamespace);
-    initHideNavbarOnScroll(60); // threshold personalizzato
-  });
-  // Inizializza la mappatura form->transizione custom dopo ogni enter
+  const nextNs = data?.next?.container?.dataset?.barbaNamespace;
+  const scope = data?.next?.container || document;
+
+  // 🔹 Inizializza moduli di base
   initFormSuccessTransition();
+  initHideNavbarOnScroll(60);
+
+  // 🔹 Riattiva gli ScrollTrigger globali
+  enableScrollTriggers();
+
+  // 🔹 Primo sync immediato (in caso di layout statico)
+  gsap.delayedCall(0.1, () => {
+    if (window.lenis) window.lenis.raf(performance.now());
+    ScrollTrigger.refresh(true);
+    console.log("⚡ ScrollTrigger refresh iniziale (0.1s)");
+  });
+
+  // 🔹 Sync principale — dopo stabilizzazione di Lenis + DOM
+  gsap.delayedCall(0.35, () => {
+    if (window.lenis) window.lenis.raf(performance.now());
+    ScrollTrigger.refresh(true);
+    console.log("✅ Lenis + ScrollTrigger refresh sincronizzato (0.35s)");
+
+    // Inizializza qui i trigger della navbar per evitare marker al top
+    if (nextNs) {
+      initNavbarThemeScroll(nextNs);
+      updateCurrentNav(nextNs);
+    }
+  });
+
+  // 🔹 Secondo refresh extra di sicurezza dopo 0.8s
+  gsap.delayedCall(0.5, () => {
+    if (window.lenis) window.lenis.raf(performance.now());
+    ScrollTrigger.refresh(true);
+    console.log("🔁 Final ScrollTrigger refresh complete (0.8s)");
+  });
 });
