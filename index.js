@@ -679,6 +679,7 @@ function getStartThemeForNs(namespace = "home") {
     esperienze: { startTheme: "dark" },
     esperienza: { startTheme: "light" },
     contatti: { startTheme: "light" },
+    err404: { startTheme: "light" },
   };
   return (navbarConfig[namespace]?.startTheme) || "dark";
 }
@@ -741,7 +742,9 @@ function setNavbarThemeInitial(namespace = "home") {
     eventi: { startTheme: "dark" },
     ristorante: { startTheme: "dark" },
     esperienze: { startTheme: "dark" },
+    esperienza: { startTheme: "light" },
     contatti: { startTheme: "light" },
+    err404: { startTheme: "light" },
   };
 
   const { startTheme = "dark" } = navbarConfig[namespace] || {};
@@ -765,6 +768,7 @@ function initNavbarThemeScroll(namespace = "home") {
     eventi: { startTheme: "dark", trigger: "#section-hero" },
     ristorante: { startTheme: "dark", trigger: "#section-hero" },
     esperienze: { startTheme: "dark", trigger: "#section-hero" },
+    esperienza: { startTheme: "light" },
     contatti: { startTheme: "light" },
   };
 
@@ -1387,7 +1391,7 @@ function initModalAuto() {
               openModal();
               console.log(`🟢 Modal "${modalId}" aperto automaticamente dopo 7s`);
             }
-          }, 5000);
+          }, 6000);
         } else {
           console.log(`⚪ Modal "${modalId}" disattivato (data-modal-active="false")`);
         }
@@ -1668,6 +1672,7 @@ const HERO_BUILDERS = {
   esperienze: initHeroHome,
   esperienza: initHeroSingleExperience,
   contatti: initHeroContact,
+  err404: initHeroContact,
 };
 
 function buildHeroForNamespace(ns, scope) {
@@ -2240,6 +2245,12 @@ once: async ({ next }) => {
         const scope = next?.container || document;
       },
     },
+    {
+      namespace: "err404",
+      afterEnter({ next }) {
+        const scope = next?.container || document;
+      },
+    },
   ]
 });
 
@@ -2331,11 +2342,11 @@ barba.hooks.afterEnter((data) => {
 
   // 🔹 Inizializza moduli di base
   initFormSuccessTransition();
-  
+  initCurrentYear(scope);
 
   // 🔹 Riattiva gli ScrollTrigger globali
   enableScrollTriggers();
-
+  
   // 🔹 Primo sync immediato (in caso di layout statico)
   gsap.delayedCall(0.1, () => {
     if (window.lenis) window.lenis.raf(performance.now());
