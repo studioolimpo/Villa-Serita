@@ -290,19 +290,23 @@ function initMenu() {
 
   // Aggiorna il tema in base allo stato del menu (salva/ripristina robusto, delay reale su chiusura)
   const handleMenuTheme = (isOpen) => {
+    const currentTheme = nav.getAttribute("data-theme") || "dark";
+
     if (isOpen) {
-      // Salva il tema corrente una sola volta per ciclo (se non è già light)
-      const currentTheme = nav.getAttribute("data-theme") || "dark";
       if (!savedTheme && currentTheme !== "light") {
         savedTheme = currentTheme;
       }
       setTheme("light", true);
-      console.log("🌞 Menu aperto → Navbar light (savedTheme:", savedTheme, ")");
+      console.log("🌞 Menu aperto → Navbar light");
     } else {
-      const restore = savedTheme || startTheme;
-      setTheme(restore, true, 0.3); // delay reale 1.5s
-      console.log(`🌙 Menu chiuso → ripristino navbar "${restore}" tra 0.3s`);
-      savedTheme = null; // reset per prossimo ciclo
+      // 🔹 Recupera il tema di partenza per la pagina attuale
+      const namespace = document.querySelector("[data-barba='container']")?.dataset?.barbaNamespace;
+      const pageStartTheme = getStartThemeForNs(namespace) || "dark";
+
+      const restore = savedTheme || pageStartTheme;
+      setTheme(restore, true, 0.3);
+      console.log(`🌙 Menu chiuso → ripristino navbar "${restore}" (pageStartTheme: ${pageStartTheme})`);
+      savedTheme = null;
     }
   };
 
