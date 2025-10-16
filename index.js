@@ -273,40 +273,36 @@ function initMenu() {
   const nav = document.querySelector(".nav_component");
   if (!navWrap || !nav) return;
 
-  let savedTheme = nav.getAttribute("data-theme") || startTheme;
-
+  let savedTheme = null;
 
   // Funzione helper per cambiare tema, evitando conflitti di tween sul nav
   const setTheme = (theme, animate = true, delay = 0) => {
     if (!window.colorThemes) return;
     const vars = colorThemes.getTheme(theme);
     if (!vars) return;
-    // Evita conflitti di tween sul nav
     gsap.killTweensOf(nav);
     const action = animate ? gsap.to : gsap.set;
     action(nav, { ...vars, duration: 0.5, ease: "power2.inOut", delay, overwrite: "auto" });
     nav.setAttribute("data-theme", theme);
   };
 
-  // Aggiorna il tema in base allo stato del menu (salva/ripristina robusto, delay reale su chiusura)
   const handleMenuTheme = (isOpen) => {
     const currentTheme = nav.getAttribute("data-theme") || "dark";
 
     if (isOpen) {
-      if (!savedTheme && currentTheme !== "light") {
-        savedTheme = currentTheme;
+      // Salva il tema corrente e forza la navbar su light
+      savedTheme = currentTheme;
+      if (currentTheme !== "light") {
+        setTheme("light", true);
+        console.log("🌞 Menu aperto → Navbar light");
       }
-      setTheme("light", true);
-      console.log("🌞 Menu aperto → Navbar light");
     } else {
-      // 🔹 Recupera il tema di partenza per la pagina attuale
-      const namespace = document.querySelector("[data-barba='container']")?.dataset?.barbaNamespace;
-      const pageStartTheme = getStartThemeForNs(namespace) || "dark";
-
-      const restore = savedTheme || pageStartTheme;
-      setTheme(restore, true, 0.3);
-      console.log(`🌙 Menu chiuso → ripristino navbar "${restore}" (pageStartTheme: ${pageStartTheme})`);
-      savedTheme = null;
+      // Ripristina il tema salvato
+      if (savedTheme) {
+        setTheme(savedTheme, true, 0.3);
+        console.log(`🌙 Menu chiuso → ripristino tema "${savedTheme}"`);
+        savedTheme = null;
+      }
     }
   };
 
