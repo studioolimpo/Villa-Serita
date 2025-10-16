@@ -1583,7 +1583,7 @@ function initHeroSingleExperience(scope = document) {
   const eyebrowWraps = section.querySelectorAll('#eyebrow-wrap .eyebrow_wrap');
   const heading   = section.querySelector('.c-heading');
   const paragraph = section.querySelector('#paragraph-group');
-  const visual      = section.querySelector('.visual_border_wrap');
+  const visual      = section.querySelector('.split_alt_visual_mask');
 
   // Stati iniziali
   gsap.set(
@@ -1642,22 +1642,22 @@ function initHeroSingleExperience(scope = document) {
 
 
 /* Stubs NON mappati (solo log, nessuna TL) */
-function initHeroWedding(scope = document) {
-if (!scope.querySelector('#hero-matrimoni')) return null;
-  return null;
-}
-function initHeroPrivateEvent(scope = document) {
-  if (!scope.querySelector('#hero-private-event')) return null;
-  return null;
-}
-function initHeroRestaurant(scope = document) {
-  if (!scope.querySelector('#hero-restaurant')) return null;
-  return null;
-}
-function initHeroExperience(scope = document) {
-  if (!scope.querySelector('#hero-experience')) return null;
-  return null;
-}
+// function initHeroWedding(scope = document) {
+// if (!scope.querySelector('#hero-matrimoni')) return null;
+//   return null;
+// }
+// function initHeroPrivateEvent(scope = document) {
+//   if (!scope.querySelector('#hero-private-event')) return null;
+//   return null;
+// }
+// function initHeroRestaurant(scope = document) {
+//   if (!scope.querySelector('#hero-restaurant')) return null;
+//   return null;
+// }
+// function initHeroExperience(scope = document) {
+//   if (!scope.querySelector('#hero-experience')) return null;
+//   return null;
+// }
 
 
 /***********************
@@ -1993,7 +1993,7 @@ barba.init({
     {
       name: "default",
       sync: false,
-      //timeout: 8000,
+      timeout: 8000,
 
         // ONCE — sposta su
 once: async ({ next }) => {
