@@ -1,3 +1,93 @@
+gsap.registerPlugin(CSSPlugin);
+
+// ===========================================
+// BARBA HOOK: leave — calcolo label in anticipo dal link cliccato
+// ===========================================
+if (window.barba && window.barba.hooks) {
+  barba.hooks.leave((data) => {
+    const { ns, lang, label, href } = computeNextMetaFromTrigger(data);
+    window.__nextLabel = label;
+    console.log("🧭 leave → next meta:", { href, ns, lang, label });
+  });
+}
+
+/***********************
+ * GLOBAL LABEL FOR BARBA TRANSITION
+ ***********************/
+window.__nextLabel = null;
+
+
+/***********************
+ * HELPER FUNZIONI MULTILINGUA
+ ***********************/
+
+// Normalizza e mappa pathname -> namespace
+function pathToNamespace(pathname) {
+  // Rimuove trailing slash e prefisso lingua "/en"
+  let p = String(pathname || "").replace(/\/+$/, "").replace(/^\/en(\/|$)/, "/");
+
+  // Home
+  if (p === "" || p === "/") return "home";
+
+  // Prende l'ultimo segmento, decodifica ed uniforma
+  const last = decodeURIComponent(p.split("/").filter(Boolean).pop() || "").toLowerCase();
+
+  // Mappa slug -> namespace (gestione nomi composti)
+  const map = {
+    "la-villa": "villa",
+    "villa": "villa",
+    "halloween-in-villa": "halloween",
+
+    "eventi-privati": "eventi",
+    "eventi": "eventi",
+
+    "matrimoni": "matrimoni",
+    "ristorante": "ristorante",
+    "esperienze": "esperienze",
+    "contatti": "contatti",
+
+    "404": "err404",
+    "errore": "err404"
+  };
+
+  return map[last] || last;
+}
+
+function getLangFromUrl(urlLike) {
+  const u = new URL(urlLike, window.location.origin);
+  return u.pathname.startsWith('/en') ? 'en' : 'it';
+}
+
+function computeNextMetaFromTrigger(data) {
+  let href = data?.trigger?.getAttribute?.('href') || null;
+  if (!href) href = window.location.href;
+  const u = new URL(href, window.location.origin);
+  const lang = u.pathname.startsWith('/en') ? 'en' : 'it';
+  const ns = pathToNamespace(u.pathname);
+  const label = getPageLabel(ns, lang);
+  return { href: u.href, lang, ns, label };
+}
+
+
+
+
+/* ============================================
+   🔤 GET PAGE LABEL — con supporto lingua forzata
+   ============================================ */
+function getPageLabel(namespace, langOverride) {
+  const lang = langOverride || getCurrentLang();
+  const labels = PAGE_LABELS[namespace];
+
+  if (!labels) {
+    console.warn(`⚠️ Nessuna label trovata per namespace: ${namespace}`);
+    return namespace;
+  }
+
+  // Restituisce la stringa corretta in base alla lingua
+  return labels[lang] || labels.it || namespace;
+}
+
+
 /***********************
  * GSAP CUSTOM EASES
  ***********************/
@@ -10,90 +100,162 @@ CustomEase.create("bgPanelEase", "0.86,0,0.07,1");
 /***********************
  * MIN CORE: label & transition title
  ***********************/
-const NAMESPACE_TITLES = {
-  home: "Home",
-  about: "About",
-  single_event: "Vivi la tua esperienza o momento speciale"
+
+/* ============================================
+   🌍 LINGUA CORRENTE
+   Lettura diretta dall'attributo <html lang="">
+   ============================================ */
+function getCurrentLang() {
+  const htmlLang = document.documentElement.getAttribute("lang");
+  return htmlLang && htmlLang.toLowerCase().startsWith("en") ? "en" : "it";
+}
+
+
+/**
+ * 🔄 Sincronizza gli href di tutti i language switcher presenti nella pagina.
+ * Copia i link dal primo switcher (master) a tutti gli altri.
+ */
+function updateLangSwitcherLinks() {
+  const switchers = document.querySelectorAll("[data-lang-switch]");
+  if (!switchers.length) return;
+
+  const currentURL = new URL(window.location.href);
+  const currentLang = currentURL.pathname.startsWith("/en") ? "en" : "it";
+
+  switchers.forEach((switcher) => {
+    const itWrap = switcher.querySelector('[data-lang="it"] a');
+    const enWrap = switcher.querySelector('[data-lang="en"] a');
+
+    if (!itWrap || !enWrap) return;
+
+    // 🔹 Normalizza il percorso
+    const normalizedPath = currentURL.pathname.replace(/^\/en/, "");
+
+    // 🔹 Costruisci i nuovi URL
+    const itURL = normalizedPath === "/" ? "/" : normalizedPath;
+    const enURL = normalizedPath === "/" ? "/en" : `/en${normalizedPath}`;
+
+    // 🔹 Assegna href dinamici
+    itWrap.setAttribute("href", itURL);
+    enWrap.setAttribute("href", enURL);
+
+    // 🔹 Gestisci classe attiva visivamente
+    if (currentLang === "it") {
+      itWrap.closest("[data-lang]").classList.add("is--active");
+      enWrap.closest("[data-lang]").classList.remove("is--active");
+    } else {
+      enWrap.closest("[data-lang]").classList.add("is--active");
+      itWrap.closest("[data-lang]").classList.remove("is--active");
+    }
+  });
+}
+
+/**
+ * 🔄 Sincronizza e inizializza tutti i language switcher Webflow presenti nella pagina.
+ * Funziona con più .w-locales-list (navbar, footer, overlay, ecc.)
+ */
+function initLanguageSwitcher() {
+  document.querySelectorAll("[data-lang-switch] [data-lang]").forEach((link) => {
+    link.removeEventListener("click", handleLangSwitch);
+    link.addEventListener("click", handleLangSwitch);
+  });
+}
+
+function handleLangSwitch(e) {
+  e.preventDefault();
+
+  const link = e.currentTarget;
+  const targetLang = link.dataset.lang?.toLowerCase();
+  const currentLang = document.documentElement.getAttribute("lang")?.toLowerCase() || "it";
+  const currentPath = window.location.pathname;
+
+  // 🔸 Se clicchi la lingua già attiva → non fare nulla
+  if (targetLang === currentLang) {
+    console.log("⚠️ Lingua già attiva:", currentLang);
+    return;
+  }
+
+  let nextPath = currentPath;
+
+  // 🔹 Se passo da IT → EN, aggiungo prefisso /en/
+  if (currentLang === "it" && targetLang === "en") {
+    nextPath = currentPath.startsWith("/en/")
+      ? currentPath
+      : `/en${currentPath}`;
+  }
+
+  // 🔹 Se passo da EN → IT, rimuovo prefisso /en/
+  if (currentLang === "en" && targetLang === "it") {
+    nextPath = currentPath.replace(/^\/en/, "") || "/";
+  }
+
+  const nextURL = `${window.location.origin}${nextPath}`;
+  console.log(`🌐 Cambio lingua da ${currentLang} → ${targetLang} | URL: ${nextURL}`);
+
+  // Disattivo Barba e ricarico
+  if (window.barba) barba.destroy();
+  window.location.href = nextURL;
+}
+
+
+/* ============================================
+   🌐 REGISTRO BILINGUE: LABEL PER NAMESPACE
+   Ogni namespace ha due valori: it / en
+   ============================================ */
+const PAGE_LABELS = {
+  home: { it: "Home", en: "Home" },
+  villa: { it: "La Villa", en: "The Villa" },
+  halloween: { it: "Halloween in Villa", en: "Halloween at The Villa" },
+  matrimoni: { it: "Matrimoni", en: "Weddings" },
+  eventi: { it: "Eventi Privati", en: "Private Events" },
+  ristorante: { it: "Ristorante", en: "Restaurant" },
+  esperienze: { it: "Esperienze", en: "Experiences" },
+  contatti: { it: "Contattaci", en: "Contact us" },
+  err404: { it: "Pagina non trovata", en: "Page Not Found" }
 };
 
 
-/* Utils */
-function parseHTML(html) {
-  try { return new DOMParser().parseFromString(html || "", "text/html"); }
-  catch { return null; }
-}
+/* ============================================
+   🔤 GET PAGE LABEL
+   Ritorna la label corretta in base alla lingua
+   ============================================ */
+// (Mantieni solo la versione principale, rimuovi il duplicato)
 
-function labelFromNamespace(ns) {
-  if (!ns) return "";
-  const key = ns.trim().toLowerCase();
-  return NAMESPACE_TITLES[key] || key
-    .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, m => m.toUpperCase());
-}
+/* ============================================
+   🧩 UTILITY — Ricava il namespace da un container
+   ============================================ */
+function getNamespace(page) {
+  if (!page) return null;
 
-function deriveLabelFromURL(urlLike) {
-  try {
-    const u = typeof urlLike === "string"
-      ? new URL(urlLike, location.origin)
-      : (urlLike?.url ? new URL(urlLike.url, location.origin) : new URL(location.href));
-    const seg = (u.pathname.split("/").filter(Boolean).pop() || "home").toLowerCase();
-    return labelFromNamespace(seg);
-  } catch { return ""; }
-}
-
-// optional
-const USE_URL_SEGMENT_FOR = new Set(["single_event"]);
-
-function lastSegmentTitle(urlLike) {
-  try {
-    const u = typeof urlLike === "string"
-      ? new URL(urlLike, location.origin)
-      : (urlLike?.url ? new URL(urlLike.url, location.origin) : new URL(location.href));
-    const segRaw = (u.pathname.split("/").filter(Boolean).pop() || "").trim();
-    const seg = decodeURIComponent(segRaw);
-    if (!seg) return "";
-    const nice = seg.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
-    return nice.replace(/\b\w/g, m => m.toUpperCase());
-  } catch { return ""; }
-}
-
-function getNextNamespace(data) {
-  const nsAttr = data?.next?.container?.getAttribute?.("data-barba-namespace");
-  if (nsAttr) return nsAttr.trim().toLowerCase();
-
-  const doc = parseHTML(data?.next?.html);
-  const nsDoc = doc?.querySelector('[data-barba="container"]')?.getAttribute("data-barba-namespace");
-  if (nsDoc) return nsDoc.trim().toLowerCase();
-
-  if (data?.next?.namespace) return data.next.namespace.trim().toLowerCase();
-
-  const urlNs = deriveLabelFromURL(data?.next?.url || "");
-  return (urlNs || "").toLowerCase();
-}
-
-function getNextLabel(data) {
-  const doc = parseHTML(data?.next?.html);
-
-  const explicit = doc?.querySelector(".transition-title")?.textContent?.trim();
-  if (explicit) return explicit;
-
-  const ns = getNextNamespace(data);
-  if (ns) {
-    if (USE_URL_SEGMENT_FOR.has(ns)) {
-      const segTitle = lastSegmentTitle(data?.next?.url || location.href);
-      if (segTitle) return segTitle;
-    }
-    const mapped = NAMESPACE_TITLES[ns];
-    if (mapped) return mapped;
+  // 1️⃣ Se esiste il container già montato, leggi direttamente dal dataset
+  if (page.container && page.container.dataset && page.container.dataset.barbaNamespace) {
+    return page.container.dataset.barbaNamespace;
   }
 
-  const fromTitle = doc?.querySelector("title")?.textContent?.trim();
-  if (fromTitle) return fromTitle;
+  // 2️⃣ Se siamo in transizione (fase leave) e il container non è ancora nel DOM,
+  //    effettua il parse dell'HTML della prossima pagina per ricavare il namespace.
+  if (page.html) {
+    try {
+      const doc = new DOMParser().parseFromString(page.html, "text/html");
+      const ns = doc.querySelector("[data-barba-namespace]")?.getAttribute("data-barba-namespace");
+      if (ns) return ns;
+    } catch (err) {
+      console.warn("⚠️ getNamespace parse fallito:", err);
+    }
+  }
 
-  const segFallback = lastSegmentTitle(data?.next?.url || location.href);
-  if (segFallback) return segFallback;
+  return null;
+}
 
-  return deriveLabelFromURL(data?.next?.url || "");
+/* ============================================
+   🔁 GET NEXT LABEL (per pannello transizione)
+   Usa il namespace della prossima pagina Barba
+   ============================================ */
+function getNextLabel(data) {
+  // Usa la variabile globale impostata dal hook beforeEnter,
+  // fallback a "Home" se non presente
+  const label = window.__nextLabel || "Home";
+  return label;
 }
 
 // general refresh scroll trigger
@@ -313,7 +475,7 @@ function initMenu() {
   const bgPanels = navWrap.querySelectorAll(".nav_menu_panel");
   const menuToggles = document.querySelectorAll("[data-menu-toggle]");
   const menuLinks = navWrap.querySelectorAll(".nav_menu_link");
-  const menuLanguage = navWrap.querySelector(".nav_menu_language");
+  const menuLanguage = navWrap.querySelector(".lang_switcher");
   const menuButton = document.querySelector(".menu_button_wrap");
   const menuButtonLayout = menuButton.querySelectorAll(".menu_button_layout");
   const menuInfo = navWrap.querySelector(".nav_menu_content");
@@ -429,6 +591,11 @@ function initMenu() {
   });
 
   $("a").on("click", function (e) {
+    // 🔹 Se il link appartiene al language switcher, non chiudere il menu
+    if ($(this).closest("[data-lang-switch]").length > 0) {
+      console.log("🌐 Click su language switcher — menu resta aperto");
+      return;
+    }
     const href = $(this).attr("href");
     const isSameHost = $(this).prop("hostname") === window.location.host;
     const isNotHash = href.indexOf("#") === -1;
@@ -2022,6 +2189,8 @@ once: async ({ next }) => {
   preventSamePageClicks();
   initFormSuccessTransition();
   initModalAuto();
+  initLanguageSwitcher();
+  updateLangSwitcherLinks();
 
   if (ns === "matrimoni") {
     initSliderReview(next.container);
@@ -2346,7 +2515,9 @@ barba.hooks.afterEnter((data) => {
 
   // 🔹 Riattiva gli ScrollTrigger globali
   enableScrollTriggers();
-  
+  initLanguageSwitcher();
+  updateLangSwitcherLinks();
+
   // 🔹 Primo sync immediato (in caso di layout statico)
   gsap.delayedCall(0.1, () => {
     if (window.lenis) window.lenis.raf(performance.now());
