@@ -1482,93 +1482,96 @@ function initAccordion(scope = document) {
  * MODAL HANDLER — apertura automatica con controllo attributo
  ***********************/
 function initModalAuto() {
-  document.addEventListener("DOMContentLoaded", function () {
-    const modalSystem = ((window.lumos ??= {}).modal ??= {
-      list: {},
-      open(id) { this.list[id]?.open?.(); },
-      closeAll() { Object.values(this.list).forEach((m) => m.close?.()); },
-    });
-
-    function createModals() {
-      document.querySelectorAll(".modal_dialog").forEach(function (modal) {
-        if (modal.dataset.scriptInitialized) return;
-        modal.dataset.scriptInitialized = "true";
-
-        const modalId = modal.getAttribute("data-modal-target");
-        let lastFocusedElement;
-
-        // GSAP timeline di apertura/chiusura
-        if (typeof gsap !== "undefined") {
-          gsap.context(() => {
-            let tl = gsap.timeline({ paused: true, onReverseComplete: resetModal });
-            tl.fromTo(modal, { opacity: 0 }, { opacity: 1, duration: 0.7, ease: "power2.out" });
-            tl.fromTo(".modal_content", { yPercent: 10, filter: "blur(5px)" }, { yPercent: 0, filter: "blur(0px)", duration: 0.9, ease: "loader" }, "<");
-            modal.tl = tl;
-          }, modal);
-        }
-
-        function resetModal() {
-          if (typeof lenis !== "undefined" && lenis.start) lenis.start();
-          else document.body.style.overflow = "";
-          modal.close();
-          if (lastFocusedElement) lastFocusedElement.focus();
-          window.dispatchEvent(new CustomEvent("modal-close", { detail: { modal } }));
-        }
-
-        function openModal() {
-          if (typeof lenis !== "undefined" && lenis.stop) lenis.stop();
-          else document.body.style.overflow = "hidden";
-          lastFocusedElement = document.activeElement;
-          modal.showModal();
-          modal.querySelector(':focus')?.blur();
-          if (typeof gsap !== "undefined") modal.tl.play();
-          modal.querySelectorAll("[data-modal-scroll]").forEach((el) => (el.scrollTop = 0));
-          window.dispatchEvent(new CustomEvent("modal-open", { detail: { modal } }));
-        }
-
-        function closeModal() {
-          if (typeof gsap === "undefined") {
-            resetModal();
-            return;
-          }
-
-          const content = modal.querySelector(".modal_content");
-
-          const tlClose = gsap.timeline({
-            defaults: { ease: "power2.inOut", duration: 0.7 },
-            onComplete: resetModal,
-          });
-
-          tlClose
-            .to(content, { yPercent: -20, autoAlpha: 0, filter: "blur(5px)" }, 0.5)
-            .to(modal, { opacity: 0, duration: 0.5 }, "<0.1");
-        }
-
-        // Eventi base
-        modal.addEventListener("cancel", (e) => (e.preventDefault(), closeModal()));
-        modal.addEventListener("click", (e) => e.target.closest("[data-modal-close]") && closeModal());
-        modalSystem.list[modalId] = { open: openModal, close: closeModal };
-
-        // 🔹 Apertura automatica condizionata
-        const modalActive = modal.getAttribute("data-modal-active") === "true";
-        if (modalActive) {
-          setTimeout(() => {
-            // Ricontrolla che sia ancora attivo prima di aprire
-            if (modal.getAttribute("data-modal-active") === "true") {
-              openModal();
-              console.log(`🟢 Modal "${modalId}" aperto automaticamente dopo 7s`);
-            }
-          }, 6000);
-        } else {
-          console.log(`⚪ Modal "${modalId}" disattivato (data-modal-active="false")`);
-        }
-      });
-    }
-
-    createModals();
+  const modalSystem = ((window.lumos ??= {}).modal ??= {
+    list: {},
+    open(id) { this.list[id]?.open?.(); },
+    closeAll() { Object.values(this.list).forEach((m) => m.close?.()); },
   });
-}
 
+  function createModals() {
+    document.querySelectorAll(".modal_dialog").forEach(function (modal) {
+      if (modal.dataset.scriptInitialized) return;
+      modal.dataset.scriptInitialized = "true";
+
+      const modalId = modal.getAttribute("data-modal-target");
+      let lastFocusedElement;
+
+      // GSAP timeline apertura/chiusura
+      if (typeof gsap !== "undefined") {
+        gsap.context(() => {
+          let tl = gsap.timeline({ paused: true, onReverseComplete: resetModal });
+          tl.fromTo(modal, { opacity: 0 }, { opacity: 1, duration: 0.7, ease: "power2.out" });
+          tl.fromTo(".modal_content", { yPercent: 10, filter: "blur(5px)" }, { yPercent: 0, filter: "blur(0px)", duration: 0.9, ease: "loader" }, "<");
+          modal.tl = tl;
+        }, modal);
+      }
+
+      function resetModal() {
+        if (typeof lenis !== "undefined" && lenis.start) lenis.start();
+        else document.body.style.overflow = "";
+        modal.close();
+        if (lastFocusedElement) lastFocusedElement.focus();
+        window.dispatchEvent(new CustomEvent("modal-close", { detail: { modal } }));
+      }
+
+      function openModal() {
+        if (typeof lenis !== "undefined" && lenis.stop) lenis.stop();
+        else document.body.style.overflow = "hidden";
+        lastFocusedElement = document.activeElement;
+        modal.showModal();
+        modal.querySelector(':focus')?.blur();
+        if (typeof gsap !== "undefined") modal.tl.play();
+        modal.querySelectorAll("[data-modal-scroll]").forEach((el) => (el.scrollTop = 0));
+        window.dispatchEvent(new CustomEvent("modal-open", { detail: { modal } }));
+      }
+
+      function closeModal() {
+        if (typeof gsap === "undefined") {
+          resetModal();
+          return;
+        }
+
+        const content = modal.querySelector(".modal_content");
+
+        const tlClose = gsap.timeline({
+          defaults: { ease: "power2.inOut", duration: 0.7 },
+          onComplete: resetModal,
+        });
+
+        tlClose
+          .to(content, { yPercent: -20, autoAlpha: 0, filter: "blur(5px)" }, 0.5)
+          .to(modal, { opacity: 0, duration: 0.5 }, "<0.1");
+      }
+
+      // Eventi base
+      modal.addEventListener("cancel", (e) => (e.preventDefault(), closeModal()));
+      modal.addEventListener("click", (e) => e.target.closest("[data-modal-close]") && closeModal());
+      modalSystem.list[modalId] = { open: openModal, close: closeModal };
+
+      // 🔹 Apertura automatica condizionata
+      const modalActive = modal.getAttribute("data-modal-active") === "true";
+      if (modalActive) {
+        setTimeout(() => {
+          if (modal.getAttribute("data-modal-active") === "true") {
+            openModal();
+            console.log(`🟢 Modal "${modalId}" aperto automaticamente dopo 7s`);
+          }
+        }, 6000);
+      } else {
+        console.log(`⚪ Modal "${modalId}" disattivato (data-modal-active="false")`);
+      }
+    });
+  }
+
+  // Esegui subito e dopo ogni cambio pagina
+  createModals();
+
+  if (window.barba) {
+    barba.hooks.afterEnter(() => {
+      createModals();
+    });
+  }
+}
 
 /***********************
  * HERO — FUNZIONI SPECIFICHE
@@ -2167,7 +2170,13 @@ once: async ({ next }) => {
   const scope = next?.container || document;
 
   // 🔹 Determina subito il namespace e aggiorna immediatamente la navbar (tema + stato corrente)
-  const ns = next?.container?.dataset?.barbaNamespace || "home";
+  let ns = next?.container?.dataset?.barbaNamespace;
+  if (!ns) {
+    const u = new URL(window.location.href);
+    const path = u.pathname.replace(/^\/en\//, "").replace(/\/$/, "");
+    ns = pathToNamespace(path);
+    console.warn("⚠️ Namespace mancante, fallback usato:", ns);
+  }
   applyNavbarStartTheme(ns);
   const startTheme = getStartThemeForNs(ns);
   forceNavbarThemeImmediate(startTheme);
@@ -2343,7 +2352,13 @@ once: async ({ next }) => {
 
   // sovrapponi la hero del namespace in ingresso solo se esiste
   try {
-    const ns = getNextNamespace(data);
+    let ns = data?.next?.container?.dataset?.barbaNamespace;
+    if (!ns) {
+      const u = new URL(window.location.href);
+      const path = u.pathname.replace(/^\/en\//, "").replace(/\/$/, "");
+      ns = pathToNamespace(path);
+      console.warn("⚠️ Namespace mancante, fallback usato:", ns);
+    }
     const heroTl = buildHeroForNamespace(ns, data.next.container);
     if (heroTl) {
       tl.add(heroTl, "-=0.7");
