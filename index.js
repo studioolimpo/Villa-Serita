@@ -835,7 +835,7 @@ function initFadeVisualScroll(scope = document) {
 }
 
 
-/***********************
+/*********************
  * ANIMATE THEME ON SCROLL
  * Seleziona gli elementi con data-reveal="scroll"
  ***********************/
