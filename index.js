@@ -7,7 +7,6 @@ if (window.barba && window.barba.hooks) {
   barba.hooks.leave((data) => {
     const { ns, lang, label, href } = computeNextMetaFromTrigger(data);
     window.__nextLabel = label;
-    console.log("🧭 leave → next meta:", { href, ns, lang, label });
   });
 }
 
@@ -171,7 +170,6 @@ function handleLangSwitch(e) {
 
   // 🔸 Se clicchi la lingua già attiva → non fare nulla
   if (targetLang === currentLang) {
-    console.log("⚠️ Lingua già attiva:", currentLang);
     return;
   }
 
@@ -190,7 +188,6 @@ function handleLangSwitch(e) {
   }
 
   const nextURL = `${window.location.origin}${nextPath}`;
-  console.log(`🌐 Cambio lingua da ${currentLang} → ${targetLang} | URL: ${nextURL}`);
 
   // Disattivo Barba e ricarico
   if (window.barba) barba.destroy();
@@ -262,7 +259,6 @@ function getNextLabel(data) {
 function refreshScrollTrigger(delay = 0.2) {
   gsap.delayedCall(delay, () => {
     ScrollTrigger.refresh();
-    console.log("✅ ScrollTrigger refreshed after hero animation");
   });
 }
 
@@ -456,13 +452,11 @@ function initMenu() {
       savedTheme = currentTheme;
       if (currentTheme !== "light") {
         setTheme("light", true);
-        console.log("🌞 Menu aperto → Navbar light");
       }
     } else {
       // Ripristina il tema salvato
       if (savedTheme) {
         setTheme(savedTheme, true, 0.3);
-        console.log(`🌙 Menu chiuso → ripristino tema "${savedTheme}"`);
         savedTheme = null;
       }
     }
@@ -532,7 +526,6 @@ function initMenu() {
         const allTriggers = ScrollTrigger.getAll();
         allTriggers.forEach(t => t.enable(false));
         ScrollTrigger.refresh(true);
-        console.log("🔁 ScrollTrigger refresh after menu open");
       });
   }
 
@@ -562,7 +555,6 @@ function initMenu() {
       try {
         if (window.lenis) window.lenis.raf(performance.now());
         ScrollTrigger.refresh(true);
-        console.log("✅ ScrollTrigger refresh after menu close");
       } catch (err) {
         console.warn("⚠️ Refresh fallito:", err);
       }
@@ -593,7 +585,6 @@ function initMenu() {
   $("a").on("click", function (e) {
     // 🔹 Se il link appartiene al language switcher, non chiudere il menu
     if ($(this).closest("[data-lang-switch]").length > 0) {
-      console.log("🌐 Click su language switcher — menu resta aperto");
       return;
     }
     const href = $(this).attr("href");
@@ -754,7 +745,6 @@ function initGlobalParallax(scope = document) {
 
 // Dissolvenza + blur per gli elementi con data-fade="scroll"
 function initFadeScroll(scope = document) {
-  console.log("initFadeScroll initialized");
   const elsAll = scope.querySelectorAll('[data-fade="scroll"]');
   const els = Array.from(elsAll).filter(
     (el) => !el.closest("#section-hero") && el.id !== "section-hero"
@@ -797,7 +787,6 @@ function initFadeScroll(scope = document) {
 
 // Solo blur per gli elementi con data-visual-fade="scroll"
 function initFadeVisualScroll(scope = document) {
-  console.log("initFadeVisualScroll initialized");
   const elsAll = scope.querySelectorAll('[data-visual-fade="scroll"]');
   const els = Array.from(elsAll).filter(
     (el) => !el.closest("#section-hero") && el.id !== "section-hero"
@@ -925,7 +914,6 @@ function applyNavbarStartTheme(namespace = "home") {
     autoAlpha: startTheme === "light" ? 1 : 0,
   });
 
-  console.log(`🌙 Navbar soft-set al tema iniziale "${startTheme}"`);
 }
 
 /**
@@ -1424,7 +1412,6 @@ function initFormSuccessTransition(scope = document) {
           // 🔹 Registra il pannello scelto
           window.__barbaTransitionTarget = panelTarget;
 
-          console.log(`✅ Form inviato → ${formName} → pannello ${panelTarget}`);
 
           // 🔹 Avvia la transizione standard
           if (window.barba) barba.go("/");
@@ -1611,11 +1598,9 @@ function initModalAuto() {
         setTimeout(() => {
           if (modal.getAttribute("data-modal-active") === "true") {
             openModal();
-            console.log(`🟢 Modal "${modalId}" aperto automaticamente dopo 7s`);
           }
-        }, 6000);
+        }, 7000);
       } else {
-        console.log(`⚪ Modal "${modalId}" disattivato (data-modal-active="false")`);
       }
     });
   }
@@ -1760,7 +1745,6 @@ function initHeroContact(scope = document) {
   const section = scope.querySelector('#section-hero');
   if (!section) return null;
 
-  console.log("✅ initHeroContact triggered");
 
   // Elementi principali
   const eyebrow   = section.querySelector('.eyebrow_wrap');
@@ -1804,7 +1788,6 @@ function initHeroSingleExperience(scope = document) {
   const section = scope.querySelector('#section-hero');
   if (!section) return null;
 
-  console.log("✅ initHeroSingleExperience triggered");
 
   // Elementi principali
   const eyebrowWraps = section.querySelectorAll('#eyebrow-wrap .eyebrow_wrap');
@@ -1905,7 +1888,6 @@ const HERO_BUILDERS = {
 function buildHeroForNamespace(ns, scope) {
   const fn = HERO_BUILDERS[ns];
   if (typeof fn !== 'function') {
-    console.log(`[HERO] nessuna animazione per "${ns}" → skip`);
     return null;
   }
   try {
@@ -2175,16 +2157,13 @@ function resetWebflow(data) {
         const ix2 = window.Webflow.require?.("ix2");
         if (ix2 && typeof ix2.init === "function") {
           ix2.init();
-          console.log("✅ Webflow IX2 reinitialized");
         } else {
-          console.log("⚠️ Webflow IX2 non disponibile, salto init");
         }
 
         // 🔹 Reinizializza Forms se serve (per sicurezza nei submit)
         const forms = window.Webflow.require?.("forms");
         if (forms && typeof forms.ready === "function") {
           forms.ready();
-          console.log("✅ Webflow Forms reinitialized");
         }
 
         window.Webflow.redraw?.up?.();
@@ -2201,7 +2180,6 @@ function resetWebflow(data) {
     //   }
     // });
 
-    console.log("🔁 Webflow reset completato");
   } catch (err) {
     console.warn("⚠️ Errore nella reinizializzazione di Webflow:", err);
   }
@@ -2295,12 +2273,10 @@ barba.init({
 
         if (window.__barbaTransitionTarget) {
           panelEl = document.querySelector(window.__barbaTransitionTarget);
-          console.log("🎯 Pannello personalizzato:", window.__barbaTransitionTarget);
           window.__lastTransitionPanel = panelEl;
           delete window.__barbaTransitionTarget;
         } else {
           panelEl = document.querySelector("#transition-default");
-          console.log("🎯 Pannello standard (default)");
           window.__lastTransitionPanel = panelEl;
         }
 
@@ -2500,7 +2476,6 @@ barba.hooks.beforeLeave(async () => {
     // 🔹 Se esiste un modal aperto, chiudilo e attendi prima di procedere
   const openModal = document.querySelector(".modal_dialog[open]");
   if (openModal) {
-    console.log("🟡 Modal aperto → chiusura e ritardo transizione");
     lumos.modal.closeAll();
     await new Promise((resolve) => setTimeout(resolve, 600)); // attende 0.2s reali
   }
@@ -2592,14 +2567,12 @@ barba.hooks.afterEnter((data) => {
   gsap.delayedCall(0.1, () => {
     if (window.lenis) window.lenis.raf(performance.now());
     ScrollTrigger.refresh(true);
-    console.log("⚡ ScrollTrigger refresh iniziale (0.1s)");
   });
 
   // 🔹 Sync principale — dopo stabilizzazione di Lenis + DOM
-  gsap.delayedCall(0.35, () => {
+  gsap.delayedCall(0.3, () => {
     if (window.lenis) window.lenis.raf(performance.now());
     ScrollTrigger.refresh(true);
-    console.log("✅ Lenis + ScrollTrigger refresh sincronizzato (0.35s)");
 
     // Inizializza qui i trigger della navbar per evitare marker al top
     if (nextNs) {
@@ -2609,10 +2582,9 @@ barba.hooks.afterEnter((data) => {
   });
 
   // 🔹 Secondo refresh extra di sicurezza dopo 0.8s
-  gsap.delayedCall(0.5, () => {
+  gsap.delayedCall(0.4, () => {
     if (window.lenis) window.lenis.raf(performance.now());
     ScrollTrigger.refresh(true);
-    console.log("🔁 Final ScrollTrigger refresh complete (0.8s)");
   });
 });
 
