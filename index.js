@@ -2191,7 +2191,7 @@ function resetWebflow(data) {
  * BARBA INIT — transizione + transition_title + heading reveal + parallax + HERO modulari
  ***********************/
 barba.init({
-  debug: true,
+  //debug: true,
   preventRunning: true,
 
   transitions: [
