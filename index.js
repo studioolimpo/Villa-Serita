@@ -777,10 +777,11 @@ function initFadeScroll(scope = document) {
       willChange: "opacity, filter"
     });
 
+    const durationValue = window.matchMedia("(max-width: 768px)").matches ? 0.7 : 1.2;
     gsap.to(el, {
       autoAlpha: 1,
       filter: "blur(0px)",
-      duration: 1.2,
+      duration: durationValue,
       ease: "power2.out",
       scrollTrigger: {
         trigger: el,
@@ -818,9 +819,10 @@ function initFadeVisualScroll(scope = document) {
       willChange: "filter"
     });
 
+    const durationValue = window.matchMedia("(max-width: 768px)").matches ? 0.7 : 1.2;
     gsap.to(el, {
       filter: "blur(0px)",
-      duration: 1.2,
+      duration: durationValue,
       ease: "power2.out",
       scrollTrigger: {
         trigger: el,
