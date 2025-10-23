@@ -1599,7 +1599,7 @@ function initModalAuto() {
           if (modal.getAttribute("data-modal-active") === "true") {
             openModal();
           }
-        }, 7000);
+        }, 8000);
       } else {
       }
     });
