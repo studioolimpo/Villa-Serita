@@ -749,31 +749,78 @@ function initGlobalParallax(scope = document) {
  * SECTION SCROLL REVEAL
  * Seleziona gli elementi con data-reveal="scroll"
  ***********************/
-function initSectionReveal(scope = document) {
-  const els = scope.querySelectorAll('[data-reveal="scroll"]');
+
+
+
+// Dissolvenza su scroll per gli elementi con data-fade="scroll"
+function initFadeScroll(scope = document) {
+  const elsAll = scope.querySelectorAll('[data-fade="scroll"]');
+  // Escludi #section-hero e i suoi discendenti
+  const els = Array.from(elsAll).filter(
+    (el) => !el.closest("#section-hero") && el.id !== "section-hero"
+  );
   if (!els.length) return;
 
-  // Evita duplicati
+  // Evita duplicati su trigger già creati
   const setEls = new Set(els);
-  ScrollTrigger.getAll().forEach(t => {
+  ScrollTrigger.getAll().forEach((t) => {
     if (setEls.has(t.trigger)) t.kill();
   });
 
-  els.forEach(el => {
-    gsap.set(el, { autoAlpha: 0, yPercent: 10 });
+  els.forEach((el) => {
+    gsap.set(el, {
+      autoAlpha: 0,
+      filter: "blur(3px)",
+      willChange: "opacity, filter"
+    });
 
     gsap.to(el, {
       autoAlpha: 1,
-      yPercent: 0,
-      duration: 1,
-      ease: "power3.out",
+      filter: "blur(0px)",
+      duration: 1.2,
+      ease: "power2.out",
       scrollTrigger: {
         trigger: el,
-        // markers: true,
-        start: "top bottom",
-        end: "top 85%",
-        toggleActions: "none play none reset",
+        start: "top 85%",
+        toggleActions: "play none none none",
         invalidateOnRefresh: true
+        // markers: true,
+      }
+    });
+  });
+}
+
+// Dissolvenza solo blur per gli elementi con data-visual-fade="scroll"
+function initFadeVisualScroll(scope = document) {
+  const elsAll = scope.querySelectorAll('[data-visual-fade="scroll"]');
+  // Escludi #section-hero e i suoi discendenti
+  const els = Array.from(elsAll).filter(
+    (el) => !el.closest("#section-hero") && el.id !== "section-hero"
+  );
+  if (!els.length) return;
+
+  // Evita duplicati su trigger già creati
+  const setEls = new Set(els);
+  ScrollTrigger.getAll().forEach((t) => {
+    if (setEls.has(t.trigger)) t.kill();
+  });
+
+  els.forEach((el) => {
+    gsap.set(el, {
+      filter: "blur(3px)",
+      willChange: "filter"
+    });
+
+    gsap.to(el, {
+      filter: "blur(0px)",
+      duration: 1,
+      ease: "power2.out",
+      scrollTrigger: {
+        trigger: el,
+        start: "top 85%",
+        toggleActions: "play none none none",
+        invalidateOnRefresh: true
+        // markers: true,
       }
     });
   });
@@ -2165,70 +2212,71 @@ barba.init({
       sync: false,
       timeout: 8000,
 
-        // ONCE — sposta su
-once: async ({ next }) => {
-  const scope = next?.container || document;
+      // ONCE — sposta su
+      once: async ({ next }) => {
+        const scope = next?.container || document;
 
-  // 🔹 Determina subito il namespace e aggiorna immediatamente la navbar (tema + stato corrente)
-  let ns = next?.container?.dataset?.barbaNamespace;
-  if (!ns) {
-    const u = new URL(window.location.href);
-    const path = u.pathname.replace(/^\/en\//, "").replace(/\/$/, "");
-    ns = pathToNamespace(path);
-    console.warn("⚠️ Namespace mancante, fallback usato:", ns);
-  }
-  applyNavbarStartTheme(ns);
-  const startTheme = getStartThemeForNs(ns);
-  forceNavbarThemeImmediate(startTheme);
-  updateCurrentNav(ns);
+        // 🔹 Determina subito il namespace e aggiorna immediatamente la navbar (tema + stato corrente)
+        let ns = next?.container?.dataset?.barbaNamespace;
+        if (!ns) {
+          const u = new URL(window.location.href);
+          const path = u.pathname.replace(/^\/en\//, "").replace(/\/$/, "");
+          ns = pathToNamespace(path);
+          console.warn("⚠️ Namespace mancante, fallback usato:", ns);
+        }
+        applyNavbarStartTheme(ns);
+        const startTheme = getStartThemeForNs(ns);
+        forceNavbarThemeImmediate(startTheme);
+        updateCurrentNav(ns);
 
-  // 1) Lenis prima di tutto (e poi lo stoppi per il loader)
-  initLenis();
-  try { window.lenis?.stop(); } catch {}
+        // 1) Lenis prima di tutto (e poi lo stoppi per il loader)
+        initLenis();
+        try { window.lenis?.stop(); } catch {}
 
-  // 2) Ora è sicuro creare i trigger e le inizializzazioni globali
-  initMenu(startTheme);
-  initSectionReveal(scope);
-  initGlobalParallax(scope);
-  initGlobalSlider(scope);
-  // initAnimateThemeScroll(scope);
-  initCurrentYear(scope);
-  initSignature();
-  initCustomCursor();
-  preventSamePageClicks();
-  initFormSuccessTransition();
-  initModalAuto();
-  initLanguageSwitcher();
-  updateLangSwitcherLinks();
+        // 2) Ora è sicuro creare i trigger e le inizializzazioni globali
+        initMenu(startTheme);
+        initFadeScroll(scope);
+        initFadeVisualScroll(scope);
+        initGlobalParallax(scope);
+        initGlobalSlider(scope);
+        // initAnimateThemeScroll(scope);
+        initCurrentYear(scope);
+        initSignature();
+        initCustomCursor();
+        preventSamePageClicks();
+        initFormSuccessTransition();
+        initModalAuto();
+        initLanguageSwitcher();
+        updateLangSwitcherLinks();
 
-  if (ns === "matrimoni") {
-    initSliderReview(next.container);
-  }
+        if (ns === "matrimoni") {
+          initSliderReview(next.container);
+        }
 
-  // 🔹 Inizializza i trigger tema-navbar dopo un leggero delay per evitare marker al top
-  gsap.delayedCall(0.1, () => {
-    applyNavbarStartTheme(ns);
-    initNavbarThemeScroll(ns);
-  });
+        // 🔹 Inizializza i trigger tema-navbar dopo un leggero delay per evitare marker al top
+        gsap.delayedCall(0.1, () => {
+          applyNavbarStartTheme(ns);
+          initNavbarThemeScroll(ns);
+        });
 
-  // 3) Prepara hero ma in pausa
-  const heroTl = buildHeroForNamespace(ns, scope);
-  if (heroTl) heroTl.pause(0);
+        // 3) Prepara hero ma in pausa
+        const heroTl = buildHeroForNamespace(ns, scope);
+        if (heroTl) heroTl.pause(0);
 
-  const loaderDone = initLoader({
-    onBeforeHide: () => {
-      gsap.delayedCall(0.3, () => heroTl?.play(0));
-    }
-  });
+        const loaderDone = initLoader({
+          onBeforeHide: () => {
+            gsap.delayedCall(0.3, () => heroTl?.play(0));
+          }
+        });
 
-  // 🔹 Riallineamento navbar immediato PRIMA del termine del loader
-  forceNavbarThemeImmediate(startTheme);
-  updateCurrentNav(ns);
-  initNavbarThemeScroll(ns);
-  refreshScrollTrigger(0.3);
+        // 🔹 Riallineamento navbar immediato PRIMA del termine del loader
+        forceNavbarThemeImmediate(startTheme);
+        updateCurrentNav(ns);
+        initNavbarThemeScroll(ns);
+        refreshScrollTrigger(0.3);
 
-  await loaderDone;
-},
+        await loaderDone;
+      },
 
       /* Uscita pagina corrente */
       leave(data) {
@@ -2379,7 +2427,6 @@ once: async ({ next }) => {
       namespace: "home",
       afterEnter({ next }) {
         const scope = next?.container || document;
-        // initSectionReveal(scope)
       },
     },
     {
@@ -2387,7 +2434,6 @@ once: async ({ next }) => {
       afterEnter({ next }) {
         const scope = next?.container || document;
         // initHeroVilla(scope) (già gestita in enter via registry)
-        // initSectionReveal(scope)
       },
     },
     {
@@ -2510,7 +2556,6 @@ barba.hooks.beforeEnter((data) => {
   // 🔹 Inizializzazioni globali
   initAutoPlayVideos(scope);
   initLenis();
-  initSectionReveal(scope);
   initGlobalParallax(scope);
   initGlobalSlider(scope);
   forceNextPageToTop();
@@ -2559,4 +2604,11 @@ barba.hooks.afterEnter((data) => {
     ScrollTrigger.refresh(true);
     console.log("🔁 Final ScrollTrigger refresh complete (0.8s)");
   });
+});
+
+// Hook globale: esegui reveal, fade e fadeScroll dopo ogni afterEnter
+barba.hooks.afterEnter(({ next }) => {
+  const scope = next?.container || document;
+  initFadeScroll(scope);
+  initFadeVisualScroll(scope);
 });
