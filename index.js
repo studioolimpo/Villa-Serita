@@ -752,22 +752,25 @@ function initGlobalParallax(scope = document) {
 
 
 
-// Dissolvenza su scroll per gli elementi con data-fade="scroll"
+// Dissolvenza + blur per gli elementi con data-fade="scroll"
 function initFadeScroll(scope = document) {
+  console.log("initFadeScroll initialized");
   const elsAll = scope.querySelectorAll('[data-fade="scroll"]');
-  // Escludi #section-hero e i suoi discendenti
   const els = Array.from(elsAll).filter(
     (el) => !el.closest("#section-hero") && el.id !== "section-hero"
   );
   if (!els.length) return;
 
-  // Evita duplicati su trigger già creati
   const setEls = new Set(els);
   ScrollTrigger.getAll().forEach((t) => {
     if (setEls.has(t.trigger)) t.kill();
   });
 
   els.forEach((el) => {
+    const startValue = window.matchMedia("(max-width: 768px)").matches
+      ? "top 95%"
+      : "top 85%";
+
     gsap.set(el, {
       autoAlpha: 0,
       filter: "blur(3px)",
@@ -781,31 +784,35 @@ function initFadeScroll(scope = document) {
       ease: "power2.out",
       scrollTrigger: {
         trigger: el,
-        start: "top 85%",
+        start: startValue,
         toggleActions: "play none none none",
-        invalidateOnRefresh: true
+        invalidateOnRefresh: true,
+        once: true
         // markers: true,
       }
     });
   });
 }
 
-// Dissolvenza solo blur per gli elementi con data-visual-fade="scroll"
+// Solo blur per gli elementi con data-visual-fade="scroll"
 function initFadeVisualScroll(scope = document) {
+  console.log("initFadeVisualScroll initialized");
   const elsAll = scope.querySelectorAll('[data-visual-fade="scroll"]');
-  // Escludi #section-hero e i suoi discendenti
   const els = Array.from(elsAll).filter(
     (el) => !el.closest("#section-hero") && el.id !== "section-hero"
   );
   if (!els.length) return;
 
-  // Evita duplicati su trigger già creati
   const setEls = new Set(els);
   ScrollTrigger.getAll().forEach((t) => {
     if (setEls.has(t.trigger)) t.kill();
   });
 
   els.forEach((el) => {
+    const startValue = window.matchMedia("(max-width: 768px)").matches
+      ? "top 95%"
+      : "top 85%";
+
     gsap.set(el, {
       filter: "blur(3px)",
       willChange: "filter"
@@ -813,13 +820,14 @@ function initFadeVisualScroll(scope = document) {
 
     gsap.to(el, {
       filter: "blur(0px)",
-      duration: 1,
+      duration: 1.2,
       ease: "power2.out",
       scrollTrigger: {
         trigger: el,
-        start: "top 85%",
+        start: startValue,
         toggleActions: "play none none none",
-        invalidateOnRefresh: true
+        invalidateOnRefresh: true,
+        once: true
         // markers: true,
       }
     });
