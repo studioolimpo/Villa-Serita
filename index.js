@@ -777,7 +777,7 @@ function initFadeScroll(scope = document) {
       willChange: "opacity, filter"
     });
 
-    const durationValue = window.matchMedia("(max-width: 768px)").matches ? 0.7 : 1.2;
+    const durationValue = window.matchMedia("(max-width: 768px)").matches ? 0.9 : 1.2;
     gsap.to(el, {
       autoAlpha: 1,
       filter: "blur(0px)",
@@ -819,7 +819,7 @@ function initFadeVisualScroll(scope = document) {
       willChange: "filter"
     });
 
-    const durationValue = window.matchMedia("(max-width: 768px)").matches ? 0.7 : 1.2;
+    const durationValue = window.matchMedia("(max-width: 768px)").matches ? 0.9 : 1.2;
     gsap.to(el, {
       filter: "blur(0px)",
       duration: durationValue,
