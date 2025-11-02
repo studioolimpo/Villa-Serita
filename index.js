@@ -2355,6 +2355,9 @@ barba.init({
         forceNavbarThemeImmediate(startTheme);
         updateCurrentNav(ns);
 
+        // 🔹 Smart Video SOLO al primo caricamento (Safari Safe)
+        initSmartVideoLoader(scope, { mode: "once" });
+
         // 1) Lenis prima di tutto (e poi lo stoppi per il loader)
         initLenis();
         try { window.lenis?.stop(); } catch {}
@@ -2748,3 +2751,13 @@ barba.hooks.once(({ next }) => {
 barba.hooks.beforeLeave(({ current }) => {
   pauseSmartVideos(current.container);
 });
+
+
+// 🔹 Smart Video per le transizioni Barba (navigazioni interne)
+if (window.barba && window.barba.hooks && !window.__smartVideoAfterEnterBound) {
+  window.__smartVideoAfterEnterBound = true;
+  barba.hooks.afterEnter((data) => {
+    const scope = data.next?.container || document;
+    initSmartVideoLoader(scope, { mode: "barba" });
+  });
+}
