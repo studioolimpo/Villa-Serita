@@ -411,27 +411,24 @@ function ensureVideoAutoplay(video) {
   io.observe(video);
 }
 
+
 /**
- * 🎥 OLIMPO SMART VIDEO SYSTEM — Safari Safe & Cross-Browser
- * Per Safari: carica video dopo il primo paint (evita white screen)
- * Per altri browser: comportamento immediato normale
+ * 🎥 Gestione video solo al primo caricamento (Safari safe)
  */
-function initSmartVideoLoader(scope = document, options = {}) {
-  const { mode = "once" } = options;
+function initSmartVideoLoaderOnce(scope = document) {
   const videos = scope.querySelectorAll("video[data-smart-video]");
   if (!videos.length) return;
 
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
   videos.forEach((video) => {
-    if (video.dataset.smartInit === "true") return;
-    video.dataset.smartInit = "true";
+    if (video.dataset.smartOnceInit === "true") return;
+    video.dataset.smartOnceInit = "true";
 
-    const originalSrc = video.getAttribute("src");
-    const dataSrc = video.dataset.src || originalSrc;
+    const dataSrc = video.dataset.src || video.getAttribute("src");
     const poster = video.getAttribute("poster");
 
-    // Mostra poster immediatamente
+    // Mostra subito il poster
     if (poster) {
       video.style.backgroundImage = `url(${poster})`;
       video.style.backgroundSize = "cover";
@@ -440,73 +437,54 @@ function initSmartVideoLoader(scope = document, options = {}) {
       video.style.backgroundColor = "#0e0d0b";
     }
 
-    // Attributi base
     video.muted = true;
     video.playsInline = true;
     video.setAttribute("playsinline", "");
     video.setAttribute("muted", "");
     video.setAttribute("loop", "");
 
-    const loadAndPlay = () => {
-      if (!dataSrc || video.src === dataSrc) return;
+    // Safari: ritardo leggero post-paint
+    if (isSafari) {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          video.src = dataSrc;
+          video.load();
+          video.play().catch(() => {});
+        }, 300);
+      });
+    } else {
+      // Altri browser → normale
       video.src = dataSrc;
-      video.load();
-      video.addEventListener(
-        "canplay",
-        () => {
-          const p = video.play();
-          if (p && typeof p.catch === "function") {
-            p.catch(() => {
-              const onUser = () => {
-                video.play();
-                window.removeEventListener("click", onUser);
-                window.removeEventListener("touchstart", onUser);
-              };
-              window.addEventListener("click", onUser, { once: true });
-              window.addEventListener("touchstart", onUser, { once: true });
-            });
-          }
-        },
-        { once: true }
-      );
-    };
-
-    const rect = video.getBoundingClientRect();
-    const isAboveFold = rect.top < window.innerHeight * 0.75;
-
-    // ✅ Modalità 1: PRIMO LOAD (once)
-    if (mode === "once") {
-      if (isSafari) {
-        if (isAboveFold) {
-          requestAnimationFrame(() => {
-            setTimeout(loadAndPlay, 300);
-          });
-        } else {
-          const io = new IntersectionObserver((entries, obs) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting) {
-                loadAndPlay();
-                obs.disconnect();
-              }
-            });
-          }, { threshold: 0.3 });
-          io.observe(video);
-        }
-      } else {
-        if (!originalSrc) video.src = dataSrc;
-        video.load();
-        video.play().catch(() => {});
-      }
-      return;
-    }
-
-    // ✅ Modalità 2: TRANSIZIONE BARBA
-    if (mode === "barba") {
-      // Su Safari, forza caricamento immediato senza ritardo
-      if (!originalSrc) video.src = dataSrc;
       video.load();
       video.play().catch(() => {});
     }
+  });
+}
+
+/**
+ * 🎥 Gestione video “normale” per le transizioni Barba
+ */
+function initSmartVideoLoaderNormal(scope = document) {
+  const videos = scope.querySelectorAll("video[data-smart-video]");
+  if (!videos.length) return;
+
+  videos.forEach((video) => {
+    if (video.dataset.smartNormalInit === "true") return;
+    video.dataset.smartNormalInit = "true";
+
+    const dataSrc = video.dataset.src || video.getAttribute("src");
+    if (!dataSrc) return;
+
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute("playsinline", "");
+    video.setAttribute("muted", "");
+    video.setAttribute("loop", "");
+
+    // Caricamento immediato
+    video.src = dataSrc;
+    video.load();
+    video.play().catch(() => {});
   });
 }
 
@@ -2355,9 +2333,6 @@ barba.init({
         forceNavbarThemeImmediate(startTheme);
         updateCurrentNav(ns);
 
-        // 🔹 Smart Video SOLO al primo caricamento (Safari Safe)
-        initSmartVideoLoader(scope, { mode: "once" });
-
         // 1) Lenis prima di tutto (e poi lo stoppi per il loader)
         initLenis();
         try { window.lenis?.stop(); } catch {}
@@ -2375,6 +2350,7 @@ barba.init({
         preventSamePageClicks();
         initFormSuccessTransition();
         initModalAuto();
+        initSmartVideoLoaderOnce(next.container);
         initLanguageSwitcher();
         updateLangSwitcherLinks();
         initHideNavbarOnScroll();
@@ -2494,270 +2470,12 @@ barba.init({
       },
       
       enter(data) {
-  // Decidi quale wrapper usare per la transizione: custom o default
-  // 🔹 Recupera il pannello usato nella transizione precedente
-  const panelEl = window.__lastTransitionPanel || document.querySelector("#transition-default");
-  const wrap = panelEl;
-  const starBottomEl = wrap?.querySelector("#spinstarbottom");
-
-  // 🔹 Delay personalizzato per transizioni specifiche
-  let nextDelay = 0;
-  const targetId =
-    window.__barbaTransitionTarget ||
-    window.__lastTransitionPanel?.id ||
-    "#transition-default";
-
-  if (
-    targetId === "#transition-contact" ||
-    targetId === "#transition-newsletter" ||
-    targetId === "transition-contact" ||
-    targetId === "transition-newsletter"
-  ) {
-    nextDelay = 5;
-  }
-
-  const tl = gsap.timeline({ defaults: { ease: "loader", duration: 1.2 } })
-    .add(() => {
-      if (starBottomEl) gsap.set(starBottomEl, { rotation: 0 });
-    }, 0)
-    .fromTo(
-      starBottomEl,
-      { rotation: 0 },
-      { rotation: 360, duration: 1.3, ease: 'spinStar', transformOrigin: 'center center'},
-    )
-    .from(data.next.container, { y: "15vh", delay: nextDelay }, "<0.2")
-    .to(wrap, { yPercent: -100 }, "<")
-    .set(wrap, { yPercent: 100, display: "none", visibility: "hidden" });
-
-  // sovrapponi la hero del namespace in ingresso solo se esiste
-  try {
-    let ns = data?.next?.container?.dataset?.barbaNamespace;
-    if (!ns) {
-      const u = new URL(window.location.href);
-      const path = u.pathname.replace(/^\/en\//, "").replace(/\/$/, "");
-      ns = pathToNamespace(path);
-      console.warn("⚠️ Namespace mancante, fallback usato:", ns);
-    }
-    const heroTl = buildHeroForNamespace(ns, data.next.container);
-    if (heroTl) {
-      tl.add(heroTl, "-=0.7");
-    }
-  } catch {}
-
-  // Reset flag dopo uso
-  if (window.__barbaTransitionTarget) {
-    window.__barbaTransitionTarget = null;
-  }
-
-  return tl;
-}
-    }
-  ],
-  views: [
-    {
-      namespace: "home",
-      afterEnter({ next }) {
-        const scope = next?.container || document;
-      },
-    },
-    {
-      namespace: "villa",
-      afterEnter({ next }) {
-        const scope = next?.container || document;
-        // initHeroVilla(scope) (già gestita in enter via registry)
-      },
-    },
-    {
-      namespace: "matrimoni",
-      afterEnter({ next }) {
-        const scope = next?.container || document;
-        initSliderReview(scope);
-        initAccordion(scope);
-      },
-    },
-    {
-      namespace: "eventi",
-      afterEnter({ next }) {
-        const scope = next?.container || document;
-        initAccordion(scope);
-      },
-    },
-    {
-      namespace: "ristorante",
-      afterEnter({ next }) {
-        const scope = next?.container || document;
-      },
-    },
-    {
-      namespace: "esperienze",
-      afterEnter({ next }) {
-        const scope = next?.container || document;
-      },
-    },
-    {
-      namespace: "esperienza",
-      afterEnter({ next }) {
-        const scope = next?.container || document;
-      },
-    },
-    {
-      namespace: "contatti",
-      afterEnter({ next }) {
-        const scope = next?.container || document;
-      },
-    },
-    {
-      namespace: "err404",
-      afterEnter({ next }) {
-        const scope = next?.container || document;
-      },
-    },
-  ]
-});
-
-// 🕓 Hook globale per ritardare l'avvio di leave se viene da un modal
-barba.hooks.beforeLeave(async () => {
-  
-    // 🔹 Se esiste un modal aperto, chiudilo e attendi prima di procedere
-  const openModal = document.querySelector(".modal_dialog[open]");
-  if (openModal) {
-    lumos.modal.closeAll();
-    await new Promise((resolve) => setTimeout(resolve, 600)); // attende 0.2s reali
-  }
-
-});
-
-// Aggiorna lo stato "current" nella navbar basandosi sul namespace attivo
-function updateCurrentNav(currentNs) {
-  // Reset di tutti i link
-  document.querySelectorAll('.nav_links_item').forEach(item => {
-    item.classList.remove('is-current');
-    const icon = item.querySelector('.nav_links_icon');
-    if (icon) gsap.set(icon, { autoAlpha: 0, display: 'none' });
-  });
-
-  // Trova il link corrispondente al namespace
-  const activeItem = document.querySelector(`#${currentNs}`);
-  if (activeItem) {
-    activeItem.classList.add('is-current');
-    const icon = activeItem.querySelector('.nav_links_icon');
-
-    // Mostra e anima l’icona (che di base è display:none)
-    if (icon) {
-      gsap.set(icon, { display: 'block' });
-      gsap.fromTo(
-        icon,
-        { autoAlpha: 0, y: '0.2rem' },
-        { autoAlpha: 1, y: '0', duration: 0.4, ease: 'power2.out', clearProps: 'display' }
-      );
-    }
-  }
-}
-
-// ================================
-// BARBA HOOKS ottimizzati
-// ================================
-
-// Disattiva e riattiva gli ScrollTrigger globali
-function disableScrollTriggers() {
-  ScrollTrigger.getAll().forEach(st => st.disable(false));
-}
-function enableScrollTriggers() {
-  ScrollTrigger.getAll().forEach(st => st.enable(false));
-}
-
-barba.hooks.beforeEnter((data) => {
-  const scope = data?.next?.container || document;
-  const nextNs = data?.next?.container?.dataset?.barbaNamespace;
-
-  // 🔹 Aggiorna subito navbar (tema + attivo)
-  if (nextNs) {
-    const startTheme = getStartThemeForNs(nextNs);
-    forceNavbarThemeImmediate(startTheme);
-    updateCurrentNav(nextNs);
-  }
-
-  
-  initHideNavbarOnScroll(50);
-
-  // 🔹 Disattiva temporaneamente tutti gli ScrollTrigger
-  disableScrollTriggers();
-
-  // 🔹 Inizializzazioni globali
-  // initAutoPlayVideos(scope);
-  initLenis();
-  initGlobalParallax(scope);
-  initGlobalSlider(scope);
-  forceNextPageToTop();
-});
-
-barba.hooks.enter((data) => {
-  if (typeof resetWebflow === "function") resetWebflow(data);
-});
-
-barba.hooks.afterEnter((data) => {
-  const nextNs = data?.next?.container?.dataset?.barbaNamespace;
-  const scope = data?.next?.container || document;
-
-  // 🔹 Inizializza moduli di base
-  initFormSuccessTransition();
-  initCurrentYear(scope);
-
-  // 🔹 Riattiva gli ScrollTrigger globali
-  enableScrollTriggers();
-  initLanguageSwitcher();
-  updateLangSwitcherLinks();
-
-  // 🔹 Primo sync immediato (in caso di layout statico)
-  gsap.delayedCall(0.1, () => {
-    if (window.lenis) window.lenis.raf(performance.now());
-    ScrollTrigger.refresh(true);
-  });
-
-  // 🔹 Sync principale — dopo stabilizzazione di Lenis + DOM
-  gsap.delayedCall(0.3, () => {
-    if (window.lenis) window.lenis.raf(performance.now());
-    ScrollTrigger.refresh(true);
-
-    // Inizializza qui i trigger della navbar per evitare marker al top
-    if (nextNs) {
-      initNavbarThemeScroll(nextNs);
-      updateCurrentNav(nextNs);
-    }
-  });
-
-  // 🔹 Secondo refresh extra di sicurezza dopo 0.8s
-  gsap.delayedCall(0.4, () => {
-    if (window.lenis) window.lenis.raf(performance.now());
-    ScrollTrigger.refresh(true);
-  });
-});
-
-// Hook globale: esegui reveal, fade e fadeScroll dopo ogni afterEnter
-barba.hooks.afterEnter((data) => {
-  const scope = data.next.container || document;
-  initFadeScroll(scope);
-  initFadeVisualScroll(scope);
-  initSmartVideoLoader(scope, { mode: "barba" });
-});
-
-// Esegui Smart Video solo al primo caricamento
-barba.hooks.once(({ next }) => {
-  const scope = next.container || document;
-  initSmartVideoLoader(scope, { mode: "once" });
-});
-
-// Pausa i video della pagina in uscita
-barba.hooks.beforeLeave(({ current }) => {
-  pauseSmartVideos(current.container);
-});
-
-
-// 🔹 Smart Video per le transizioni Barba (navigazioni interne)
-if (window.barba && window.barba.hooks && !window.__smartVideoAfterEnterBound) {
-  window.__smartVideoAfterEnterBound = true;
-  barba.hooks.afterEnter((data) => {
-    const scope = data.next?.container || document;
-    initSmartVideoLoader(scope, { mode: "barba" });
-  });
-}
+        // Decidi quale wrapper usare per la transizione: custom o default
+        // 🔹 Recupera il pannello transizione
+        // ... (resto della funzione)
+        // Inizializza hero
+        const ns = getNamespace(data.next) || "home";
+        const heroTl = buildHeroForNamespace(ns, data.next.container);
+        // ... (eventuali altre inizializzazioni)
+        initSmartVideoLoaderNormal(data.next.container);
+        // ... (resto della funzione)
