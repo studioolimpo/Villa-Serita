@@ -336,53 +336,79 @@ function ensureTopOnHardLoad() {
 
 function ensureVideoAutoplay(video) {
   if (!video) return;
+  if (video.dataset.initialized === "true") return;
+  video.dataset.initialized = "true";
 
-  // Imposta i flag in modo robusto (iOS/Safari richiedono muted + playsInline)
+  // Imposta attributi base
   video.muted = true;
-  video.playsInline = true; // property
-  video.setAttribute('playsinline', '');
-  video.setAttribute('muted', '');
-  video.setAttribute('autoplay', '');
-  video.setAttribute('loop', '');
+  video.playsInline = true;
+  video.setAttribute("playsinline", "");
+  video.setAttribute("muted", "");
+  video.setAttribute("loop", "");
 
-  // Alcuni browser “perdono” il preload dopo il replace del DOM
-  if (!video.getAttribute('preload')) video.setAttribute('preload', 'auto');
+  // ✅ Safari detection
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-  // Se la readyState è bassa, chiedi di caricare
-  try {
-    if (video.readyState < 2) {
-      // Forza un (ri)load per far ripartire la pipeline
-      // (evita se stai usando <source> multipli con HLS: in quel caso spesso non serve)
-      video.load();
-    }
-  } catch {}
+  // ✅ Mostra poster subito (anche se Safari non ha ancora caricato nulla)
+  const poster = video.getAttribute("poster");
+  if (poster) {
+    video.style.backgroundImage = `url(${poster})`;
+    video.style.backgroundSize = "cover";
+    video.style.backgroundPosition = "center";
+  }
 
-  // Prova a far partire
+  // Funzione play sicura
   const tryPlay = () => {
-    const p = video.play();
-    if (p && typeof p.catch === 'function') {
-      p.catch(() => {
-        // Se fallisce (policy browser), riprova quando entra in viewport
-        // o al primo interazione utente
+    const playPromise = video.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(() => {
+        const onUser = () => {
+          video.play();
+          window.removeEventListener("click", onUser);
+          window.removeEventListener("touchstart", onUser);
+        };
+        window.addEventListener("click", onUser, { once: true });
+        window.addEventListener("touchstart", onUser, { once: true });
       });
     }
   };
 
-  // iOS a volte non parte finché il video non è "visibile"
-  // Usiamo un piccolo IntersectionObserver per sicurezza
-  if (!video.__ioAttached) {
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((en) => {
-        if (en.isIntersecting) {
-          tryPlay();
-        }
-      });
-    }, { threshold: 0.1 });
-    io.observe(video);
-    video.__ioAttached = io;
+  // Funzione per caricare e avviare il video
+  const loadAndPlay = () => {
+    const src = video.getAttribute("src") || video.getAttribute("data-src");
+    if (src && !video.src) video.src = src;
+
+    // ⚙️ Safari non gestisce bene preload=auto → lasciamo none
+    if (!isSafari) {
+      video.setAttribute("preload", "auto");
+    }
+
+    // Avvia solo quando Safari conferma che può riprodurre senza stalli
+    video.addEventListener("canplaythrough", () => tryPlay(), { once: true });
+
+    // carica solo ora
+    video.load();
+  };
+
+  // Se è visibile all'avvio (hero above the fold) → carica subito
+  const rect = video.getBoundingClientRect();
+  const isAboveTheFold = rect.top < window.innerHeight && rect.bottom > 0;
+  if (isAboveTheFold) {
+    loadAndPlay();
+    return;
   }
 
-  tryPlay();
+  // Lazy load → solo quando entra nel viewport
+  const io = new IntersectionObserver((entries, obs) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        loadAndPlay();
+        obs.disconnect();
+      }
+    });
+  }, { threshold: 0.3 });
+
+  io.observe(video);
 }
 
 function initAutoPlayVideos(scope = document) {
