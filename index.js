@@ -411,19 +411,111 @@ function ensureVideoAutoplay(video) {
   io.observe(video);
 }
 
-function initAutoPlayVideos(scope = document) {
-  const root = scope instanceof Element ? scope : document;
-  const videos = root.querySelectorAll('video[autoplay], video[data-autoplay]');
-  videos.forEach(ensureVideoAutoplay);
+/**
+ * 🎥 OLIMPO SMART VIDEO SYSTEM
+ * Gestione automatica dei video (Safari safe + Lazy + Barba compatibile)
+ */
 
-  // Cleanup handle sul container per eventuale disconnessione degli IO
-  root.__videoCleanup = () => {
-    videos.forEach(v => {
-      try { v.__ioAttached?.disconnect(); } catch {}
-      v.__ioAttached = null;
-    });
-  };
+function initSmartVideoLoader(scope = document) {
+  const videos = scope.querySelectorAll("video[data-smart-video]");
+  if (!videos.length) return;
+
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+  videos.forEach((video) => {
+    if (video.dataset.smartInit === "true") return;
+    video.dataset.smartInit = "true";
+
+    const src = video.dataset.src;
+    const poster = video.getAttribute("poster");
+
+    // fallback visivo
+    if (poster) {
+      video.style.backgroundImage = `url(${poster})`;
+      video.style.backgroundSize = "cover";
+      video.style.backgroundPosition = "center";
+    }
+
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute("playsinline", "");
+    video.setAttribute("muted", "");
+    video.setAttribute("loop", "");
+
+    const loadAndPlay = () => {
+      if (!src || video.src === src) return;
+      video.src = src;
+      video.load();
+
+      video.addEventListener(
+        "canplay",
+        () => {
+          const playPromise = video.play();
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(() => {
+              const onUser = () => {
+                video.play();
+                window.removeEventListener("click", onUser);
+                window.removeEventListener("touchstart", onUser);
+              };
+              window.addEventListener("click", onUser, { once: true });
+              window.addEventListener("touchstart", onUser, { once: true });
+            });
+          }
+        },
+        { once: true }
+      );
+    };
+
+    // Se visibile subito → carica dopo la paint
+    const rect = video.getBoundingClientRect();
+    const isAboveFold = rect.top < window.innerHeight * 0.75;
+
+    if (isAboveFold) {
+      requestAnimationFrame(() => {
+        setTimeout(loadAndPlay, isSafari ? 200 : 100);
+      });
+    } else {
+      // Lazy load con IntersectionObserver
+      const io = new IntersectionObserver((entries, obs) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            loadAndPlay();
+            obs.disconnect();
+          }
+        });
+      }, { threshold: 0.3 });
+      io.observe(video);
+    }
+  });
 }
+
+/**
+ * ⏸️ Pausa tutti i video quando si cambia pagina (Barba hook)
+ */
+function pauseSmartVideos(scope = document) {
+  const videos = scope.querySelectorAll("video[data-smart-video]");
+  videos.forEach((v) => {
+    try {
+      v.pause();
+      v.currentTime = 0;
+    } catch {}
+  });
+}
+
+// function initAutoPlayVideos(scope = document) {
+//   const root = scope instanceof Element ? scope : document;
+//   const videos = root.querySelectorAll('video[autoplay], video[data-autoplay]');
+//   videos.forEach(ensureVideoAutoplay);
+
+//   // Cleanup handle sul container per eventuale disconnessione degli IO
+//   root.__videoCleanup = () => {
+//     videos.forEach(v => {
+//       try { v.__ioAttached?.disconnect(); } catch {}
+//       v.__ioAttached = null;
+//     });
+//   };
+// }
 
 function pauseAndResetVideos(scope = document) {
   const root = scope instanceof Element ? scope : document;
@@ -2566,7 +2658,7 @@ barba.hooks.beforeEnter((data) => {
   disableScrollTriggers();
 
   // 🔹 Inizializzazioni globali
-  initAutoPlayVideos(scope);
+  // initAutoPlayVideos(scope);
   initLenis();
   initGlobalParallax(scope);
   initGlobalSlider(scope);
@@ -2621,3 +2713,10 @@ barba.hooks.afterEnter(({ next }) => {
   initFadeScroll(scope);
   initFadeVisualScroll(scope);
 });
+
+
+if (window.barba) {
+  barba.hooks.once(({ next }) => initSmartVideoLoader(next.container));
+  barba.hooks.afterEnter(({ next }) => initSmartVideoLoader(next.container));
+  barba.hooks.beforeLeave(({ current }) => pauseSmartVideos(current.container));
+}
