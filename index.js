@@ -412,39 +412,45 @@ function ensureVideoAutoplay(video) {
 }
 
 /**
- * 🎥 OLIMPO SMART VIDEO SYSTEM
- * Gestione automatica dei video (Safari safe + Lazy + Barba compatibile)
+ * 🎥 OLIMPO SMART VIDEO SYSTEM — Safari Safe & Cross-Browser
+ * Per Safari: carica video dopo il primo paint (evita white screen)
+ * Per altri browser: comportamento immediato normale
  */
-
 function initSmartVideoLoader(scope = document) {
   const videos = scope.querySelectorAll("video[data-smart-video]");
   if (!videos.length) return;
 
+  // ✅ Rileva Safari (desktop + mobile)
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
   videos.forEach((video) => {
     if (video.dataset.smartInit === "true") return;
     video.dataset.smartInit = "true";
 
-    const src = video.dataset.src;
+    const originalSrc = video.getAttribute("src");
+    const dataSrc = video.dataset.src || originalSrc;
     const poster = video.getAttribute("poster");
 
-    // fallback visivo
+    // Mostra poster immediatamente per evitare flicker
     if (poster) {
       video.style.backgroundImage = `url(${poster})`;
       video.style.backgroundSize = "cover";
       video.style.backgroundPosition = "center";
+      video.style.backgroundRepeat = "no-repeat";
+      video.style.backgroundColor = "#0e0d0b";
     }
 
+    // Attributi base
     video.muted = true;
     video.playsInline = true;
     video.setAttribute("playsinline", "");
     video.setAttribute("muted", "");
     video.setAttribute("loop", "");
 
+    // Funzione di caricamento + autoplay
     const loadAndPlay = () => {
-      if (!src || video.src === src) return;
-      video.src = src;
+      if (!dataSrc || video.src === dataSrc) return;
+      video.src = dataSrc;
       video.load();
 
       video.addEventListener(
@@ -467,25 +473,47 @@ function initSmartVideoLoader(scope = document) {
       );
     };
 
-    // Se visibile subito → carica dopo la paint
+    // 🔹 Verifica se il video è visibile al caricamento
     const rect = video.getBoundingClientRect();
     const isAboveFold = rect.top < window.innerHeight * 0.75;
 
-    if (isAboveFold) {
-      requestAnimationFrame(() => {
-        setTimeout(loadAndPlay, isSafari ? 200 : 100);
-      });
+    // ===========================
+    // 🧭 COMPORTAMENTO CROSS-BROWSER
+    // ===========================
+
+    if (isSafari) {
+      // — Safari: ritarda il caricamento solo se sopra la piega
+      if (isAboveFold) {
+        const startAfterPaint = () => {
+          // attende un ciclo di paint completo prima di caricare il video
+          requestAnimationFrame(() => {
+            setTimeout(loadAndPlay, 300); // ritardo leggero
+          });
+        };
+        if (document.readyState === "complete") {
+          startAfterPaint();
+        } else {
+          window.addEventListener("load", startAfterPaint, { once: true });
+        }
+      } else {
+        // Lazy load se fuori viewport
+        const io = new IntersectionObserver((entries, obs) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              loadAndPlay();
+              obs.disconnect();
+            }
+          });
+        }, { threshold: 0.3 });
+        io.observe(video);
+      }
     } else {
-      // Lazy load con IntersectionObserver
-      const io = new IntersectionObserver((entries, obs) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            loadAndPlay();
-            obs.disconnect();
-          }
-        });
-      }, { threshold: 0.3 });
-      io.observe(video);
+      // — Tutti gli altri browser: comportamento normale immediato
+      if (!originalSrc) {
+        video.src = dataSrc;
+      }
+      video.load();
+      video.play().catch(() => {});
     }
   });
 }
