@@ -416,11 +416,11 @@ function ensureVideoAutoplay(video) {
  * Per Safari: carica video dopo il primo paint (evita white screen)
  * Per altri browser: comportamento immediato normale
  */
-function initSmartVideoLoader(scope = document) {
+function initSmartVideoLoader(scope = document, options = {}) {
+  const { mode = "once" } = options;
   const videos = scope.querySelectorAll("video[data-smart-video]");
   if (!videos.length) return;
 
-  // ✅ Rileva Safari (desktop + mobile)
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
   videos.forEach((video) => {
@@ -431,7 +431,7 @@ function initSmartVideoLoader(scope = document) {
     const dataSrc = video.dataset.src || originalSrc;
     const poster = video.getAttribute("poster");
 
-    // Mostra poster immediatamente per evitare flicker
+    // Mostra poster immediatamente
     if (poster) {
       video.style.backgroundImage = `url(${poster})`;
       video.style.backgroundSize = "cover";
@@ -447,18 +447,16 @@ function initSmartVideoLoader(scope = document) {
     video.setAttribute("muted", "");
     video.setAttribute("loop", "");
 
-    // Funzione di caricamento + autoplay
     const loadAndPlay = () => {
       if (!dataSrc || video.src === dataSrc) return;
       video.src = dataSrc;
       video.load();
-
       video.addEventListener(
         "canplay",
         () => {
-          const playPromise = video.play();
-          if (playPromise && typeof playPromise.catch === "function") {
-            playPromise.catch(() => {
+          const p = video.play();
+          if (p && typeof p.catch === "function") {
+            p.catch(() => {
               const onUser = () => {
                 video.play();
                 window.removeEventListener("click", onUser);
@@ -473,45 +471,39 @@ function initSmartVideoLoader(scope = document) {
       );
     };
 
-    // 🔹 Verifica se il video è visibile al caricamento
     const rect = video.getBoundingClientRect();
     const isAboveFold = rect.top < window.innerHeight * 0.75;
 
-    // ===========================
-    // 🧭 COMPORTAMENTO CROSS-BROWSER
-    // ===========================
-
-    if (isSafari) {
-      // — Safari: ritarda il caricamento solo se sopra la piega
-      if (isAboveFold) {
-        const startAfterPaint = () => {
-          // attende un ciclo di paint completo prima di caricare il video
+    // ✅ Modalità 1: PRIMO LOAD (once)
+    if (mode === "once") {
+      if (isSafari) {
+        if (isAboveFold) {
           requestAnimationFrame(() => {
-            setTimeout(loadAndPlay, 300); // ritardo leggero
+            setTimeout(loadAndPlay, 300);
           });
-        };
-        if (document.readyState === "complete") {
-          startAfterPaint();
         } else {
-          window.addEventListener("load", startAfterPaint, { once: true });
+          const io = new IntersectionObserver((entries, obs) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                loadAndPlay();
+                obs.disconnect();
+              }
+            });
+          }, { threshold: 0.3 });
+          io.observe(video);
         }
       } else {
-        // Lazy load se fuori viewport
-        const io = new IntersectionObserver((entries, obs) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              loadAndPlay();
-              obs.disconnect();
-            }
-          });
-        }, { threshold: 0.3 });
-        io.observe(video);
+        if (!originalSrc) video.src = dataSrc;
+        video.load();
+        video.play().catch(() => {});
       }
-    } else {
-      // — Tutti gli altri browser: comportamento normale immediato
-      if (!originalSrc) {
-        video.src = dataSrc;
-      }
+      return;
+    }
+
+    // ✅ Modalità 2: TRANSIZIONE BARBA
+    if (mode === "barba") {
+      // Su Safari, forza caricamento immediato senza ritardo
+      if (!originalSrc) video.src = dataSrc;
       video.load();
       video.play().catch(() => {});
     }
@@ -2415,6 +2407,9 @@ barba.init({
 
       /* Uscita pagina corrente */
       leave(data) {
+        // Pausa i video nella pagina in uscita
+        pauseSmartVideos(data.current.container);
+
         // Determina quale pannello usare
         let panelEl;
 
@@ -2736,15 +2731,20 @@ barba.hooks.afterEnter((data) => {
 });
 
 // Hook globale: esegui reveal, fade e fadeScroll dopo ogni afterEnter
-barba.hooks.afterEnter(({ next }) => {
-  const scope = next?.container || document;
+barba.hooks.afterEnter((data) => {
+  const scope = data.next.container || document;
   initFadeScroll(scope);
   initFadeVisualScroll(scope);
+  initSmartVideoLoader(scope, { mode: "barba" });
 });
 
+// Esegui Smart Video solo al primo caricamento
+barba.hooks.once(({ next }) => {
+  const scope = next.container || document;
+  initSmartVideoLoader(scope, { mode: "once" });
+});
 
-if (window.barba) {
-  barba.hooks.once(({ next }) => initSmartVideoLoader(next.container));
-  barba.hooks.afterEnter(({ next }) => initSmartVideoLoader(next.container));
-  barba.hooks.beforeLeave(({ current }) => pauseSmartVideos(current.container));
-}
+// Pausa i video della pagina in uscita
+barba.hooks.beforeLeave(({ current }) => {
+  pauseSmartVideos(current.container);
+});
