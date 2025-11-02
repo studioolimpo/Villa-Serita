@@ -1042,7 +1042,7 @@ function initNavbarThemeScroll(namespace = "home") {
 /***********************
  * HIDE / SHOW NAVBAR ON SCROLL
  ***********************/
-function initHideNavbarOnScroll(threshold = 80) {
+function initHideNavbarOnScroll(threshold = 50) {
   const nav = document.querySelector(".nav_desktop_wrap");
   if (!nav) return;
 
@@ -2236,6 +2236,7 @@ barba.init({
         initModalAuto();
         initLanguageSwitcher();
         updateLangSwitcherLinks();
+        initHideNavbarOnScroll();
 
         if (ns === "matrimoni") {
           initSliderReview(next.container);
