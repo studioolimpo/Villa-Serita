@@ -329,235 +329,6 @@ function ensureTopOnHardLoad() {
 }
 
 
-/**
- * AUTOPLAY VIDEO
- * Blocco funzioni che assicurano autoplay video
- */
-
-function ensureVideoAutoplay(video) {
-  if (!video) return;
-  if (video.dataset.initialized === "true") return;
-  video.dataset.initialized = "true";
-
-  // Imposta attributi base
-  video.muted = true;
-  video.playsInline = true;
-  video.setAttribute("playsinline", "");
-  video.setAttribute("muted", "");
-  video.setAttribute("loop", "");
-
-  // ✅ Safari detection
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-  // ✅ Mostra poster subito (anche se Safari non ha ancora caricato nulla)
-  const poster = video.getAttribute("poster");
-  if (poster) {
-    video.style.backgroundImage = `url(${poster})`;
-    video.style.backgroundSize = "cover";
-    video.style.backgroundPosition = "center";
-  }
-
-  // Funzione play sicura
-  const tryPlay = () => {
-    const playPromise = video.play();
-    if (playPromise && typeof playPromise.catch === "function") {
-      playPromise.catch(() => {
-        const onUser = () => {
-          video.play();
-          window.removeEventListener("click", onUser);
-          window.removeEventListener("touchstart", onUser);
-        };
-        window.addEventListener("click", onUser, { once: true });
-        window.addEventListener("touchstart", onUser, { once: true });
-      });
-    }
-  };
-
-  // Funzione per caricare e avviare il video
-  const loadAndPlay = () => {
-    const src = video.getAttribute("src") || video.getAttribute("data-src");
-    if (src && !video.src) video.src = src;
-
-    // ⚙️ Safari non gestisce bene preload=auto → lasciamo none
-    if (!isSafari) {
-      video.setAttribute("preload", "auto");
-    }
-
-    // Avvia solo quando Safari conferma che può riprodurre senza stalli
-    video.addEventListener("canplaythrough", () => tryPlay(), { once: true });
-
-    // carica solo ora
-    video.load();
-  };
-
-  // Se è visibile all'avvio (hero above the fold) → carica subito
-  const rect = video.getBoundingClientRect();
-  const isAboveTheFold = rect.top < window.innerHeight && rect.bottom > 0;
-  if (isAboveTheFold) {
-    loadAndPlay();
-    return;
-  }
-
-  // Lazy load → solo quando entra nel viewport
-  const io = new IntersectionObserver((entries, obs) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        loadAndPlay();
-        obs.disconnect();
-      }
-    });
-  }, { threshold: 0.3 });
-
-  io.observe(video);
-}
-
-/**
- * 🎥 OLIMPO SMART VIDEO SYSTEM — Safari Safe & Cross-Browser
- * Per Safari: carica video dopo il primo paint (evita white screen)
- * Per altri browser: comportamento immediato normale
- */
-function initSmartVideoLoader(scope = document, options = {}) {
-  const { mode = "once" } = options;
-  const videos = scope.querySelectorAll("video[data-smart-video]");
-  if (!videos.length) return;
-
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-  videos.forEach((video) => {
-    if (video.dataset.smartInit === "true") return;
-    video.dataset.smartInit = "true";
-
-    const originalSrc = video.getAttribute("src");
-    const dataSrc = video.dataset.src || originalSrc;
-    const poster = video.getAttribute("poster");
-
-    // Mostra poster immediatamente
-    if (poster) {
-      video.style.backgroundImage = `url(${poster})`;
-      video.style.backgroundSize = "cover";
-      video.style.backgroundPosition = "center";
-      video.style.backgroundRepeat = "no-repeat";
-      video.style.backgroundColor = "#0e0d0b";
-    }
-
-    // Attributi base
-    video.muted = true;
-    video.playsInline = true;
-    video.setAttribute("playsinline", "");
-    video.setAttribute("muted", "");
-    video.setAttribute("loop", "");
-
-    const loadAndPlay = () => {
-      if (!dataSrc || video.src === dataSrc) return;
-      video.src = dataSrc;
-      video.load();
-      video.addEventListener(
-        "canplay",
-        () => {
-          const p = video.play();
-          if (p && typeof p.catch === "function") {
-            p.catch(() => {
-              const onUser = () => {
-                video.play();
-                window.removeEventListener("click", onUser);
-                window.removeEventListener("touchstart", onUser);
-              };
-              window.addEventListener("click", onUser, { once: true });
-              window.addEventListener("touchstart", onUser, { once: true });
-            });
-          }
-        },
-        { once: true }
-      );
-    };
-
-    const rect = video.getBoundingClientRect();
-    const isAboveFold = rect.top < window.innerHeight * 0.75;
-
-    // ✅ Modalità 1: PRIMO LOAD (once)
-    if (mode === "once") {
-      if (isSafari) {
-        if (isAboveFold) {
-          requestAnimationFrame(() => {
-            setTimeout(loadAndPlay, 300);
-          });
-        } else {
-          const io = new IntersectionObserver((entries, obs) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting) {
-                loadAndPlay();
-                obs.disconnect();
-              }
-            });
-          }, { threshold: 0.3 });
-          io.observe(video);
-        }
-      } else {
-        if (!originalSrc) video.src = dataSrc;
-        video.load();
-        video.play().catch(() => {});
-      }
-      return;
-    }
-
-    // ✅ Modalità 2: TRANSIZIONE BARBA
-    if (mode === "barba") {
-      // Su Safari, forza caricamento immediato senza ritardo
-      if (!originalSrc) video.src = dataSrc;
-      video.load();
-      video.play().catch(() => {});
-    }
-  });
-}
-
-/**
- * ⏸️ Pausa tutti i video quando si cambia pagina (Barba hook)
- */
-function pauseSmartVideos(scope = document) {
-  const videos = scope.querySelectorAll("video[data-smart-video]");
-  videos.forEach((v) => {
-    try {
-      v.pause();
-      v.currentTime = 0;
-    } catch {}
-  });
-}
-
-// function initAutoPlayVideos(scope = document) {
-//   const root = scope instanceof Element ? scope : document;
-//   const videos = root.querySelectorAll('video[autoplay], video[data-autoplay]');
-//   videos.forEach(ensureVideoAutoplay);
-
-//   // Cleanup handle sul container per eventuale disconnessione degli IO
-//   root.__videoCleanup = () => {
-//     videos.forEach(v => {
-//       try { v.__ioAttached?.disconnect(); } catch {}
-//       v.__ioAttached = null;
-//     });
-//   };
-// }
-
-function pauseAndResetVideos(scope = document) {
-  const root = scope instanceof Element ? scope : document;
-  const videos = root.querySelectorAll('video');
-  videos.forEach((v) => {
-    try {
-      v.pause();
-      // opzionale: torna a inizio per non “suonare” quando rientri da bfcache
-      v.currentTime = 0;
-    } catch {}
-  });
-  // pulizia IO se c'è
-  if (typeof root.__videoCleanup === 'function') {
-    try { root.__videoCleanup(); } catch {}
-    delete root.__videoCleanup;
-  }
-}
-
-
-
-
-
 
 /***********************
  * MENU HANDLER
@@ -1514,7 +1285,7 @@ function preventSamePageClicks() {
  * FORM SUCCESS → Trigger Barba con pannello personalizzato
  ***********************/
 function initFormSuccessTransition(scope = document) {
-// Seleziona solo i form Webflow all’interno dello scope (utile per Barba)
+
   const $forms = $(scope).find(".w-form form");
 
   $forms.each(function () {
@@ -1920,8 +1691,7 @@ function initHeroContact(scope = document) {
   return tl;
 }
 
-
-// HERO 
+// HERO SINGLE EXPERIENCE
 function initHeroSingleExperience(scope = document) {
   const section = scope.querySelector('#section-hero');
   if (!section) return null;
@@ -1987,25 +1757,6 @@ function initHeroSingleExperience(scope = document) {
 
   return tl;
 }
-
-
-/* Stubs NON mappati (solo log, nessuna TL) */
-// function initHeroWedding(scope = document) {
-// if (!scope.querySelector('#hero-matrimoni')) return null;
-//   return null;
-// }
-// function initHeroPrivateEvent(scope = document) {
-//   if (!scope.querySelector('#hero-private-event')) return null;
-//   return null;
-// }
-// function initHeroRestaurant(scope = document) {
-//   if (!scope.querySelector('#hero-restaurant')) return null;
-//   return null;
-// }
-// function initHeroExperience(scope = document) {
-//   if (!scope.querySelector('#hero-experience')) return null;
-//   return null;
-// }
 
 
 /***********************
@@ -2104,14 +1855,11 @@ function initLoader(opts = {}) {
 
   const startTime = performance.now();
 
-  // Timeline loader
   const tl = gsap.timeline({ defaults: {}, paused: true });
 
-  // Loader progressivo numerico
   const counter = { value: 0 };
   const loaderDuration = 1.8; // durata caricamento
 
-  // Aggiorna il testo con la percentuale
   function updateLoaderText() {
     const progress = Math.round(counter.value);
     if (progressEl) progressEl.textContent = `${progress}%`;
@@ -2125,7 +1873,6 @@ function initLoader(opts = {}) {
     tl.to(texts, { autoAlpha: 1, y: 0, duration: 1.4, ease: easeOut2 }, "<0.6");
   }
 
-  // Fade-in del wrapper loader_progress + transition_icon
   if (progressWrap) {
     tl.fromTo(
       progressWrap,
@@ -2133,7 +1880,6 @@ function initLoader(opts = {}) {
       { autoAlpha: 1, duration: 0.6, ease: "loader" },
       "<"
     );
-    // Fade-in transition_icon (same timing and ease as progressWrap)
     if (transitionIcon) {
       tl.fromTo(
         transitionIcon,
@@ -2144,7 +1890,6 @@ function initLoader(opts = {}) {
     }
   }
 
-  // Animazione del counter dopo il fade-in
   tl.to(counter, {
     value: 100,
     duration: loaderDuration,
@@ -2152,7 +1897,6 @@ function initLoader(opts = {}) {
     onUpdate: updateLoaderText
   }, "<");
 
-  // Fade-in e rotazione stella (in contemporanea al counter)
   if (starEl) {
     tl.to(
       starEl,
@@ -2172,7 +1916,7 @@ function initLoader(opts = {}) {
 
   tl.to(wrap, { y: "-100%", duration: 1, ease: "loaderPanel" }, "+=0.1");
   // tl.fromTo(main, {yPercent: 2}, {yPercent:0, ease: "loaderPanel", duration: 1.2}, "<")
-    // .set(main, { clearProps: "transform" });
+  // .set(main, { clearProps: "transform" });
 
   tl.add(() => {
     gsap.set(wrap, { clearProps: "y" });
@@ -2211,72 +1955,12 @@ function initLoader(opts = {}) {
  * RESET WEBFLOW
  * Reinizializza IX2 e altri componenti Webflow dopo ogni transizione Barba
  ***********************/
-// function resetWebflow(data) {
-//   const parser = new DOMParser();
-//   const doc = parser.parseFromString(data.next.html, "text/html");
-//   const webflowPageId = doc.querySelector("html")?.getAttribute("data-wf-page");
-
-//   // Aggiorna ID pagina Webflow
-//   if (webflowPageId) {
-//     document.documentElement.setAttribute("data-wf-page", webflowPageId);
-//   }
-
-//   // Reinizializza le interazioni Webflow IX2
-//   if (window.Webflow) {
-//     try {
-//       window.Webflow.destroy?.();
-//       window.Webflow.ready?.();
-
-//       const ix2 = window.Webflow.require?.("ix2");
-//       if (ix2 && typeof ix2.init === "function") {
-//         ix2.init();
-//       }
-
-//       window.Webflow.redraw?.up?.();
-//       console.log("✅ Webflow IX2 reinitialized");
-//     } catch (err) {
-//       console.warn("⚠️ Errore nella reinizializzazione di Webflow:", err);
-//     }
-//   }
-
-//   // Rimuove e riapplica la classe 'w--current' ai link corretti
-//   document.querySelectorAll(".w--current").forEach(el => el.classList.remove("w--current"));
-//   document.querySelectorAll("a").forEach(link => {
-//     if (link.getAttribute("href") === window.location.pathname) {
-//       link.classList.add("w--current");
-//     }
-//   });
-
-//   // Riesegue eventuali script inline personalizzati con attributo data-barba-script
-//   doc.querySelectorAll("[data-barba-script]").forEach((scriptEl) => {
-//     let codeString = scriptEl.textContent || "";
-//     if (codeString.includes("DOMContentLoaded")) {
-//       codeString = codeString
-//         .replace(/window\.addEventListener\("DOMContentLoaded",.*?=>\s*{/, "")
-//         .replace(/}\);?$/, "");
-//     }
-
-//     const newScript = document.createElement("script");
-//     newScript.type = "text/javascript";
-//     const srcAttr = scriptEl.getAttribute("src");
-//     if (srcAttr) {
-//       newScript.src = srcAttr;
-//     } else {
-//       newScript.textContent = codeString;
-//     }
-
-//     document.body.appendChild(newScript);
-//     newScript.remove();
-//   });
-
-//   console.log("🔁 Webflow reset completato");
-// }
 
 function resetWebflow(data) {
   if (typeof window.Webflow === "undefined") return;
 
   try {
-    // Aggiorna ID pagina Webflow
+
     const parser = new DOMParser();
     const doc = parser.parseFromString(data.next.html, "text/html");
     const webflowPageId = doc.querySelector("html")?.getAttribute("data-wf-page");
@@ -2284,21 +1968,18 @@ function resetWebflow(data) {
       document.documentElement.setAttribute("data-wf-page", webflowPageId);
     }
 
-    // Distruggi e reinizializza Webflow
     window.Webflow.destroy?.();
 
     setTimeout(() => {
       try {
         window.Webflow.ready?.();
 
-        // 🔹 Reinizializza IX2 (interazioni)
         const ix2 = window.Webflow.require?.("ix2");
         if (ix2 && typeof ix2.init === "function") {
           ix2.init();
         } else {
         }
 
-        // 🔹 Reinizializza Forms se serve (per sicurezza nei submit)
         const forms = window.Webflow.require?.("forms");
         if (forms && typeof forms.ready === "function") {
           forms.ready();
@@ -2308,15 +1989,7 @@ function resetWebflow(data) {
       } catch (innerErr) {
         console.warn("⚠️ Errore durante il reset Webflow:", innerErr);
       }
-    }, 100); // leggero delay per sicurezza
-
-    // // Ripristina classi w--current
-    // document.querySelectorAll(".w--current").forEach(el => el.classList.remove("w--current"));
-    // document.querySelectorAll("a").forEach(link => {
-    //   if (link.getAttribute("href") === window.location.pathname) {
-    //     link.classList.add("w--current");
-    //   }
-    // });
+    }, 100);
 
   } catch (err) {
     console.warn("⚠️ Errore nella reinizializzazione di Webflow:", err);
@@ -2324,12 +1997,175 @@ function resetWebflow(data) {
 }
 
 
+/***********************
+ * BUNNY HLS — Background video player (autoplay, lazy, Hls.js)
+ ***********************/
+
+function initBunnyPlayerBackground() {
+  document.querySelectorAll('[data-bunny-background-init]').forEach(function(player) {
+    var src = player.getAttribute('data-player-src');
+    if (!src) return;
+
+    var video = player.querySelector('video');
+    if (!video) return;
+
+    try { video.pause(); } catch(_) {}
+    try { video.removeAttribute('src'); video.load(); } catch(_) {}
+
+    // Attribute helpers
+    function setStatus(s) {
+      if (player.getAttribute('data-player-status') !== s) {
+        player.setAttribute('data-player-status', s);
+      }
+    }
+    function setActivated(v) { player.setAttribute('data-player-activated', v ? 'true' : 'false'); }
+    if (!player.hasAttribute('data-player-activated')) setActivated(false);
+
+    // Flags
+    var lazyMode   = player.getAttribute('data-player-lazy'); // "true" | "false" (no meta)
+    var isLazyTrue = lazyMode === 'true';
+    var autoplay   = player.getAttribute('data-player-autoplay') === 'true';
+    var initialMuted = player.getAttribute('data-player-muted') === 'true';
+
+    // Used to suppress 'ready' flicker when user just pressed play in lazy modes
+    var pendingPlay = false;
+
+    // Autoplay forces muted + loop; IO will drive play/pause
+    if (autoplay) { video.muted = true; video.loop = true; }
+    else { video.muted = initialMuted; }
+
+    video.setAttribute('muted', '');
+    video.setAttribute('playsinline', '');
+    video.setAttribute('webkit-playsinline', '');
+    video.playsInline = true;
+    if (typeof video.disableRemotePlayback !== 'undefined') video.disableRemotePlayback = true;
+    if (autoplay) video.autoplay = false;
+
+    var isSafariNative = !!video.canPlayType('application/vnd.apple.mpegurl');
+    var canUseHlsJs    = !!(window.Hls && Hls.isSupported()) && !isSafariNative;
+
+    // Attach media only once (for actual playback)
+    var isAttached = false;
+    var userInteracted = false;
+    var lastPauseBy = ''; // 'io' | 'manual' | ''
+    function attachMediaOnce() {
+      if (isAttached) return;
+      isAttached = true;
+
+      if (player._hls) { try { player._hls.destroy(); } catch(_) {} player._hls = null; }
+
+      if (isSafariNative) {
+        video.preload = isLazyTrue ? 'none' : 'auto';
+        video.src = src;
+        video.addEventListener('loadedmetadata', function() {
+          readyIfIdle(player, pendingPlay);
+        }, { once: true });
+      } else if (canUseHlsJs) {
+        var hls = new Hls({ maxBufferLength: 10 });
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MEDIA_ATTACHED, function() { hls.loadSource(src); });
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+          readyIfIdle(player, pendingPlay);
+        });
+        player._hls = hls;
+      } else {
+        video.src = src;
+      }
+    }
+
+    // Initialize based on lazy mode
+    if (isLazyTrue) {
+      video.preload = 'none';
+    } else {
+      attachMediaOnce();
+    }
+
+    // Toggle play/pause
+    function togglePlay() {
+      userInteracted = true;
+      if (video.paused || video.ended) {
+        if (isLazyTrue && !isAttached) attachMediaOnce();
+        pendingPlay = true;
+        lastPauseBy = '';
+        setStatus('loading');
+        safePlay(video);
+      } else {
+        lastPauseBy = 'manual';
+        video.pause();
+      }
+    }
+
+    // Toggle mute
+    function toggleMute() {
+      video.muted = !video.muted;
+      player.setAttribute('data-player-muted', video.muted ? 'true' : 'false');
+    }
+
+    // Controls (delegated)
+    player.addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-player-control]');
+      if (!btn || !player.contains(btn)) return;
+      var type = btn.getAttribute('data-player-control');
+      if (type === 'play' || type === 'pause' || type === 'playpause') togglePlay();
+      else if (type === 'mute') toggleMute();
+    });
+
+    // Media event wiring
+    video.addEventListener('play', function() { setActivated(true); setStatus('playing'); });
+    video.addEventListener('playing', function() { pendingPlay = false; setStatus('playing'); });
+    video.addEventListener('pause', function() { pendingPlay = false; setStatus('paused'); });
+    video.addEventListener('waiting', function() { setStatus('loading'); });
+    video.addEventListener('canplay', function() { readyIfIdle(player, pendingPlay); });
+    video.addEventListener('ended', function() { pendingPlay = false; setStatus('paused'); setActivated(false); });
+
+    // In-view auto play/pause (only when autoplay is true)
+    if (autoplay) {
+      if (player._io) { try { player._io.disconnect(); } catch(_) {} }
+      var io = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          var inView = entry.isIntersecting && entry.intersectionRatio > 0;
+          if (inView) {
+            if (isLazyTrue && !isAttached) attachMediaOnce();
+            if ((lastPauseBy === 'io') || (video.paused && lastPauseBy !== 'manual')) {
+              setStatus('loading');
+              if (video.paused) togglePlay();
+              lastPauseBy = '';
+            }
+          } else {
+            if (!video.paused && !video.ended) {
+              lastPauseBy = 'io';
+              video.pause();
+            }
+          }
+        });
+      }, { threshold: 0.1 });
+      io.observe(player);
+      player._io = io;
+    }
+  });
+
+  // Helper: Ready status guard
+  function readyIfIdle(player, pendingPlay) {
+    if (!pendingPlay &&
+        player.getAttribute('data-player-activated') !== 'true' &&
+        player.getAttribute('data-player-status') === 'idle') {
+      player.setAttribute('data-player-status', 'ready');
+    }
+  }
+
+  // Helper: safe programmatic play
+  function safePlay(video) {
+    var p = video.play();
+    if (p && typeof p.then === 'function') p.catch(function(){});
+  }
+}
+
 
 /***********************
  * BARBA INIT — transizione + transition_title + heading reveal + parallax + HERO modulari
  ***********************/
 barba.init({
-  //debug: true,
+  // debug: true,
   preventRunning: true,
 
   transitions: [
@@ -2338,11 +2174,9 @@ barba.init({
       sync: false,
       timeout: 8000,
 
-      // ONCE — sposta su
       once: async ({ next }) => {
         const scope = next?.container || document;
 
-        // 🔹 Determina subito il namespace e aggiorna immediatamente la navbar (tema + stato corrente)
         let ns = next?.container?.dataset?.barbaNamespace;
         if (!ns) {
           const u = new URL(window.location.href);
@@ -2355,11 +2189,9 @@ barba.init({
         forceNavbarThemeImmediate(startTheme);
         updateCurrentNav(ns);
 
-        // 1) Lenis prima di tutto (e poi lo stoppi per il loader)
         initLenis();
         try { window.lenis?.stop(); } catch {}
 
-        // 2) Ora è sicuro creare i trigger e le inizializzazioni globali
         initMenu(startTheme);
         initFadeScroll(scope);
         initFadeVisualScroll(scope);
@@ -2375,18 +2207,17 @@ barba.init({
         initLanguageSwitcher();
         updateLangSwitcherLinks();
         initHideNavbarOnScroll();
+        initBunnyPlayerBackground();
 
         if (ns === "matrimoni") {
           initSliderReview(next.container);
         }
 
-        // 🔹 Inizializza i trigger tema-navbar dopo un leggero delay per evitare marker al top
         gsap.delayedCall(0.1, () => {
           applyNavbarStartTheme(ns);
           initNavbarThemeScroll(ns);
         });
 
-        // 3) Prepara hero ma in pausa
         const heroTl = buildHeroForNamespace(ns, scope);
         if (heroTl) heroTl.pause(0);
 
@@ -2396,7 +2227,6 @@ barba.init({
           }
         });
 
-        // 🔹 Riallineamento navbar immediato PRIMA del termine del loader
         forceNavbarThemeImmediate(startTheme);
         updateCurrentNav(ns);
         initNavbarThemeScroll(ns);
@@ -2405,12 +2235,8 @@ barba.init({
         await loaderDone;
       },
 
-      /* Uscita pagina corrente */
       leave(data) {
-        // Pausa i video nella pagina in uscita
-        pauseSmartVideos(data.current.container);
 
-        // Determina quale pannello usare
         let panelEl;
 
         if (window.__barbaTransitionTarget) {
@@ -2426,7 +2252,7 @@ barba.init({
         const titleEl = panelEl?.querySelector(".transition_title");
         const textEl = panelEl?.querySelector(".transition_text");
         const starTopEl = panelEl?.querySelector("#spinstartop");
-        // 🔹 Imposta il titolo a "Grazie" se il pannello non è quello di default
+
         let nextLabel = getNextLabel(data);
         if (panelEl && panelEl.id !== "transition-default") {
           nextLabel = "Grazie";
@@ -2438,7 +2264,7 @@ barba.init({
           .set(panelEl, { display: "block", visibility: "visible", yPercent: 100 })
           .to(data.current.container, { y: "-15vh" }, "<")
           .to(panelEl, { yPercent: 0 }, "<")
-          // Animazione transition_seal (solo autoAlpha)
+
           .fromTo(
             sealEl,
             { autoAlpha: 0, },
@@ -2466,7 +2292,7 @@ barba.init({
               { rotation: 380, duration: 1.5, ease: 'spinStar', transformOrigin: 'center center'},
               0
           )
-          // cleanup completo dopo il sipario
+
           .add(() => {
             if (typeof data.current.container.__swiperCleanup === "function") {
               data.current.container.__swiperCleanup();
@@ -2482,8 +2308,6 @@ barba.init({
               if (data.current.container.contains(t.trigger)) t.kill();
             });
 
-            pauseAndResetVideos(data.current.container);
-
             destroyLenis();
           })
   
@@ -2491,13 +2315,15 @@ barba.init({
       },
       
       enter(data) {
-  // Decidi quale wrapper usare per la transizione: custom o default
-  // 🔹 Recupera il pannello usato nella transizione precedente
+
+        const scope = data.next.container || document;
+        initBunnyPlayerBackground();
+
   const panelEl = window.__lastTransitionPanel || document.querySelector("#transition-default");
   const wrap = panelEl;
   const starBottomEl = wrap?.querySelector("#spinstarbottom");
 
-  // 🔹 Delay personalizzato per transizioni specifiche
+
   let nextDelay = 0;
   const targetId =
     window.__barbaTransitionTarget ||
@@ -2526,7 +2352,6 @@ barba.init({
     .to(wrap, { yPercent: -100 }, "<")
     .set(wrap, { yPercent: 100, display: "none", visibility: "hidden" });
 
-  // sovrapponi la hero del namespace in ingresso solo se esiste
   try {
     let ns = data?.next?.container?.dataset?.barbaNamespace;
     if (!ns) {
@@ -2541,7 +2366,6 @@ barba.init({
     }
   } catch {}
 
-  // Reset flag dopo uso
   if (window.__barbaTransitionTarget) {
     window.__barbaTransitionTarget = null;
   }
@@ -2561,7 +2385,6 @@ barba.init({
       namespace: "villa",
       afterEnter({ next }) {
         const scope = next?.container || document;
-        // initHeroVilla(scope) (già gestita in enter via registry)
       },
     },
     {
@@ -2612,34 +2435,31 @@ barba.init({
   ]
 });
 
-// 🕓 Hook globale per ritardare l'avvio di leave se viene da un modal
 barba.hooks.beforeLeave(async () => {
   
-    // 🔹 Se esiste un modal aperto, chiudilo e attendi prima di procedere
   const openModal = document.querySelector(".modal_dialog[open]");
   if (openModal) {
     lumos.modal.closeAll();
-    await new Promise((resolve) => setTimeout(resolve, 600)); // attende 0.2s reali
+    await new Promise((resolve) => setTimeout(resolve, 600)); // wait 0.2s
   }
 
 });
 
-// Aggiorna lo stato "current" nella navbar basandosi sul namespace attivo
 function updateCurrentNav(currentNs) {
-  // Reset di tutti i link
+
   document.querySelectorAll('.nav_links_item').forEach(item => {
     item.classList.remove('is-current');
     const icon = item.querySelector('.nav_links_icon');
     if (icon) gsap.set(icon, { autoAlpha: 0, display: 'none' });
   });
 
-  // Trova il link corrispondente al namespace
+
   const activeItem = document.querySelector(`#${currentNs}`);
   if (activeItem) {
     activeItem.classList.add('is-current');
     const icon = activeItem.querySelector('.nav_links_icon');
 
-    // Mostra e anima l’icona (che di base è display:none)
+
     if (icon) {
       gsap.set(icon, { display: 'block' });
       gsap.fromTo(
@@ -2655,7 +2475,7 @@ function updateCurrentNav(currentNs) {
 // BARBA HOOKS ottimizzati
 // ================================
 
-// Disattiva e riattiva gli ScrollTrigger globali
+
 function disableScrollTriggers() {
   ScrollTrigger.getAll().forEach(st => st.disable(false));
 }
@@ -2667,7 +2487,7 @@ barba.hooks.beforeEnter((data) => {
   const scope = data?.next?.container || document;
   const nextNs = data?.next?.container?.dataset?.barbaNamespace;
 
-  // 🔹 Aggiorna subito navbar (tema + attivo)
+
   if (nextNs) {
     const startTheme = getStartThemeForNs(nextNs);
     forceNavbarThemeImmediate(startTheme);
@@ -2677,11 +2497,10 @@ barba.hooks.beforeEnter((data) => {
   
   initHideNavbarOnScroll(50);
 
-  // 🔹 Disattiva temporaneamente tutti gli ScrollTrigger
+
   disableScrollTriggers();
 
-  // 🔹 Inizializzazioni globali
-  // initAutoPlayVideos(scope);
+
   initLenis();
   initGlobalParallax(scope);
   initGlobalSlider(scope);
@@ -2696,55 +2515,39 @@ barba.hooks.afterEnter((data) => {
   const nextNs = data?.next?.container?.dataset?.barbaNamespace;
   const scope = data?.next?.container || document;
 
-  // 🔹 Inizializza moduli di base
+
   initFormSuccessTransition();
   initCurrentYear(scope);
 
-  // 🔹 Riattiva gli ScrollTrigger globali
   enableScrollTriggers();
   initLanguageSwitcher();
   updateLangSwitcherLinks();
 
-  // 🔹 Primo sync immediato (in caso di layout statico)
+
   gsap.delayedCall(0.1, () => {
     if (window.lenis) window.lenis.raf(performance.now());
     ScrollTrigger.refresh(true);
   });
 
-  // 🔹 Sync principale — dopo stabilizzazione di Lenis + DOM
+
   gsap.delayedCall(0.3, () => {
     if (window.lenis) window.lenis.raf(performance.now());
     ScrollTrigger.refresh(true);
 
-    // Inizializza qui i trigger della navbar per evitare marker al top
     if (nextNs) {
       initNavbarThemeScroll(nextNs);
       updateCurrentNav(nextNs);
     }
   });
 
-  // 🔹 Secondo refresh extra di sicurezza dopo 0.8s
   gsap.delayedCall(0.4, () => {
     if (window.lenis) window.lenis.raf(performance.now());
     ScrollTrigger.refresh(true);
   });
 });
 
-// Hook globale: esegui reveal, fade e fadeScroll dopo ogni afterEnter
 barba.hooks.afterEnter((data) => {
   const scope = data.next.container || document;
   initFadeScroll(scope);
   initFadeVisualScroll(scope);
-  initSmartVideoLoader(scope, { mode: "barba" });
-});
-
-// Esegui Smart Video solo al primo caricamento
-barba.hooks.once(({ next }) => {
-  const scope = next.container || document;
-  initSmartVideoLoader(scope, { mode: "once" });
-});
-
-// Pausa i video della pagina in uscita
-barba.hooks.beforeLeave(({ current }) => {
-  pauseSmartVideos(current.container);
 });
