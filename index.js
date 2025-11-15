@@ -2012,6 +2012,22 @@ function initBunnyPlayerBackground() {
     try { video.pause(); } catch(_) {}
     try { video.removeAttribute('src'); video.load(); } catch(_) {}
 
+    // --- SO PATCH: force immediate ready/playing state ---
+    setStatus('playing');
+    setActivated(true);
+
+    // ensure muted for autoplay
+    video.muted = true;
+    video.setAttribute('muted', 'true');
+
+    // prevent loading spinner visibility
+    player.setAttribute('data-player-status', 'playing');
+
+    // tiny async play attempt to warm up the element
+    setTimeout(() => {
+      try { video.play().catch(()=>{}); } catch(e) {}
+    }, 50);
+
     // Attribute helpers
     function setStatus(s) {
       if (player.getAttribute('data-player-status') !== s) {
@@ -2087,7 +2103,7 @@ function initBunnyPlayerBackground() {
         if (isLazyTrue && !isAttached) attachMediaOnce();
         pendingPlay = true;
         lastPauseBy = '';
-        setStatus('loading');
+        setStatus('playing');
         safePlay(video);
       } else {
         lastPauseBy = 'manual';
@@ -2114,8 +2130,15 @@ function initBunnyPlayerBackground() {
     video.addEventListener('play', function() { setActivated(true); setStatus('playing'); });
     video.addEventListener('playing', function() { pendingPlay = false; setStatus('playing'); });
     video.addEventListener('pause', function() { pendingPlay = false; setStatus('paused'); });
-    video.addEventListener('waiting', function() { setStatus('loading'); });
+    video.addEventListener('waiting', function() {
+      // SO PATCH — prevent hourglass on transitions
+      setStatus('playing');
+    });
     video.addEventListener('canplay', function() { readyIfIdle(player, pendingPlay); });
+    video.addEventListener('loadstart', function() {
+      // SO PATCH — avoid clessidra on SPA transitions
+      setStatus('playing');
+    });
     video.addEventListener('ended', function() { pendingPlay = false; setStatus('paused'); setActivated(false); });
 
     // In-view auto play/pause (only when autoplay is true)
@@ -2127,7 +2150,7 @@ function initBunnyPlayerBackground() {
           if (inView) {
             if (isLazyTrue && !isAttached) attachMediaOnce();
             if ((lastPauseBy === 'io') || (video.paused && lastPauseBy !== 'manual')) {
-              setStatus('loading');
+              setStatus('playing');
               if (video.paused) togglePlay();
               lastPauseBy = '';
             }
@@ -2207,6 +2230,7 @@ barba.init({
   initModalAuto();
   initLanguageSwitcher();
   updateLangSwitcherLinks();
+  initBunnyPlayerBackground();
 
   if (ns === "matrimoni" || ns === "eventi") {
     initAccordion(next.container);
@@ -2222,7 +2246,7 @@ barba.init({
   --------------------------------------------------------------*/
   const loaderDone = initLoader({
     onBeforeHide: () => {
-      try { initBunnyPlayerBackground(); } catch(e) { console.warn("Early bunny init error:", e); }
+      // try { initBunnyPlayerBackground(); } catch(e) { console.warn("Early bunny init error:", e); }
       try { heroTl?.play(0); } catch(e) { console.warn("Hero early play error:", e); }
     }
   });
