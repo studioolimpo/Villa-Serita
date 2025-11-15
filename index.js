@@ -2103,7 +2103,7 @@ function initBunnyPlayerBackground() {
         if (isLazyTrue && !isAttached) attachMediaOnce();
         pendingPlay = true;
         lastPauseBy = '';
-        setStatus('playing');
+        setStatus('loading');
         safePlay(video);
       } else {
         lastPauseBy = 'manual';
@@ -2130,15 +2130,8 @@ function initBunnyPlayerBackground() {
     video.addEventListener('play', function() { setActivated(true); setStatus('playing'); });
     video.addEventListener('playing', function() { pendingPlay = false; setStatus('playing'); });
     video.addEventListener('pause', function() { pendingPlay = false; setStatus('paused'); });
-    video.addEventListener('waiting', function() {
-      // SO PATCH — prevent hourglass on transitions
-      setStatus('playing');
-    });
+    video.addEventListener('waiting', function() { setStatus('loading'); });
     video.addEventListener('canplay', function() { readyIfIdle(player, pendingPlay); });
-    video.addEventListener('loadstart', function() {
-      // SO PATCH — avoid clessidra on SPA transitions
-      setStatus('playing');
-    });
     video.addEventListener('ended', function() { pendingPlay = false; setStatus('paused'); setActivated(false); });
 
     // In-view auto play/pause (only when autoplay is true)
@@ -2150,7 +2143,7 @@ function initBunnyPlayerBackground() {
           if (inView) {
             if (isLazyTrue && !isAttached) attachMediaOnce();
             if ((lastPauseBy === 'io') || (video.paused && lastPauseBy !== 'manual')) {
-              setStatus('playing');
+              setStatus('loading');
               if (video.paused) togglePlay();
               lastPauseBy = '';
             }
