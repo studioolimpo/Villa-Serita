@@ -2175,96 +2175,112 @@ barba.init({
       timeout: 8000,
 
       once: async ({ next }) => {
-        // Scope del container corrente
-        const scope = next?.container || document;
+  const scope = next?.container || document;
 
-        
+  /*--------------------------------------------------------------
+    1) Calcolo namespace (robusto per Safari / BFCache)
+  --------------------------------------------------------------*/
+  let ns = next?.container?.dataset?.barbaNamespace;
+  if (!ns) {
+    const u = new URL(window.location.href);
+    const path = u.pathname.replace(/^\/en\//, "").replace(/\/$/, "");
+    ns = pathToNamespace(path);
+  }
 
-        // 1) Avvio del loader il prima possibile
-        const loaderDone = initLoader({
-          onBeforeHide: () => {
-            // Qui non facciamo nulla, l'hero parte DOPO il loader
-          }
-        });
+  /*--------------------------------------------------------------
+    2) Navbar: tema iniziale immediato (solo CSS, zero JS pesante)
+  --------------------------------------------------------------*/
+  const startTheme = getStartThemeForNs(ns);
+  applyNavbarStartTheme(ns);
+  forceNavbarThemeImmediate(startTheme);
+  updateCurrentNav(ns);
 
-        try {
-          // 2) Namespace robusto (fallback da URL, utile per Safari)
-          let ns = next?.container?.dataset?.barbaNamespace;
-          if (!ns) {
-            const u = new URL(window.location.href);
-            const path = u.pathname.replace(/^\/en\//, "").replace(/\/$/, "");
-            ns = pathToNamespace(path);
-            console.warn("⚠️ Namespace mancante, fallback usato:", ns);
-          }
+  /*--------------------------------------------------------------
+    3) Inits LEGGERE (non bloccano Safari)
+  --------------------------------------------------------------*/
+  initMenu();
+  initCurrentYear(scope);
+  initSignature();
+  initCustomCursor();
+  preventSamePageClicks();
+  initFormSuccessTransition(scope);
+  initModalAuto();
+  initLanguageSwitcher();
+  updateLangSwitcherLinks();
 
-          // 3) Navbar, tema e nav current
-          applyNavbarStartTheme(ns);
-          const startTheme = getStartThemeForNs(ns);
-          forceNavbarThemeImmediate(startTheme);
-          updateCurrentNav(ns);
+  if (ns === "matrimoni" || ns === "eventi") {
+    initAccordion(next.container);
+  }
 
-          // 4) Inizializzazioni "core" ma SENZA animazioni pensanti
-          initLenis();
-          try { window.lenis?.stop(); } catch {}
+  /*--------------------------------------------------------------
+    4) Precostruzione HERO (ferma in pausa)
+  --------------------------------------------------------------*/
+  const heroTl = buildHeroForNamespace(ns, scope);
 
-          initMenu();
-          initGlobalParallax(scope);
-          initGlobalSlider(scope);
-          initCurrentYear(scope);
-          initSignature();
-          initCustomCursor();
-          preventSamePageClicks();
-          initFormSuccessTransition(scope);
-          initModalAuto();
-          initLanguageSwitcher();
-          updateLangSwitcherLinks();
-          initHideNavbarOnScroll();
-          initBunnyPlayerBackground();
+  /*--------------------------------------------------------------
+    5) Loader – parte SUBITO, e lancia hero al momento giusto
+  --------------------------------------------------------------*/
+  const loaderDone = initLoader({
+    onBeforeHide: () => {
+      try { initBunnyPlayerBackground(); } catch(e) { console.warn("Early bunny init error:", e); }
+      try { heroTl?.play(0); } catch(e) { console.warn("Hero early play error:", e); }
+    }
+  });
 
-          // Swiper extra solo dove serve
-          if (ns === "matrimoni") {
-            initSliderReview(next.container);
-            initAccordion(next.container);
-          } else if (ns === "eventi") {
-            initAccordion(next.container);
-          }
+  /*--------------------------------------------------------------
+    6) PIPELINE POST-LOADER (SOLO 2 FASI)
+  --------------------------------------------------------------*/
+  loaderDone.then(() => {
 
-          // 5) Effetti di scroll / fade solo DOPO il loader
-          loaderDone.then(() => {
-            try {
-              initFadeScroll(scope);
-              initFadeVisualScroll(scope);
+    /*----------------------------------------
+      FASE 1 — CRITICAL (subito dopo loader)
+    ----------------------------------------*/
+    try {
+      initLenis();
+      window.lenis?.start();
 
-              gsap.delayedCall(0.05, () => {
-                applyNavbarStartTheme(ns);
-                initNavbarThemeScroll(ns);
-                if (window.lenis) window.lenis.raf(performance.now());
-                ScrollTrigger.refresh(true);
-              });
-            } catch (e) {
-              console.warn("⚠️ Errore init effetti scroll post-loader:", e);
-            }
-          });
+      initFadeScroll(scope);
+      initFadeVisualScroll(scope);
 
-          // 6) HERO: niente attesa extra lato Safari
-          const heroTl = buildHeroForNamespace(ns, scope);
-          if (heroTl) {
-            loaderDone.then(() => {
-              try { heroTl.play(0); } catch (e) { console.warn("[HERO] errore play:", e); }
-            });
-          }
+      applyNavbarStartTheme(ns);
+      initNavbarThemeScroll(ns);
+      initHideNavbarOnScroll();
 
-          // 7) Ulteriore forza bruta sul tema navbar per evitare flash
-          forceNavbarThemeImmediate(startTheme);
-          updateCurrentNav(ns);
+      window.lenis?.raf(performance.now());
+      ScrollTrigger.refresh(true);
 
-        } catch (err) {
-          console.warn("⚠️ Errore durante l'init iniziale (once):", err);
+    } catch(err) {
+      console.warn("⚠️ Errore FASE 1:", err);
+    }
+
+    /*----------------------------------------
+      FASE 2 — LAZY (200ms dopo)
+    ----------------------------------------*/
+    gsap.delayedCall(0.2, () => {
+      try {
+        initGlobalParallax(scope);
+        initGlobalSlider(scope);
+
+        if (ns === "matrimoni") {
+          initSliderReview(next.container);
         }
 
-        // 8) Attendi comunque la fine del loader prima di rilasciare Barba
-        await loaderDone;
-      },
+        // HLS Bunny — quello più pesante → qui
+        // initBunnyPlayerBackground();
+
+        window.lenis?.raf(performance.now());
+        ScrollTrigger.refresh(true);
+
+      } catch(err) {
+        console.warn("⚠️ Errore FASE 2:", err);
+      }
+    });
+
+  });
+
+  // Barba aspetta la fine del loader
+  await loaderDone;
+},
 
       leave(data) {
 
