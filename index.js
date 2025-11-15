@@ -2178,6 +2178,8 @@ barba.init({
         // Scope del container corrente
         const scope = next?.container || document;
 
+        
+
         // 1) Avvio del loader il prima possibile
         const loaderDone = initLoader({
           onBeforeHide: () => {
