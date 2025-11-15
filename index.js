@@ -1792,6 +1792,17 @@ function buildHeroForNamespace(ns, scope) {
 /***********************
  * LOADER
  ***********************/
+function waitFontsWithTimeout(timeout = 1200) {
+  const fontsPromise =
+    (document.fonts && document.fonts.ready)
+      ? document.fonts.ready
+      : Promise.resolve();
+
+  const timeoutPromise = new Promise(resolve => setTimeout(resolve, timeout));
+
+  return Promise.race([fontsPromise, timeoutPromise]);
+}
+
 function initLoader(opts = {}) {
   const {
     minDuration = 600,
@@ -1926,7 +1937,7 @@ function initLoader(opts = {}) {
     try { window.lenis?.start(); } catch {}
   });
 
-  const ready = (document.fonts?.ready || Promise.resolve())
+  const ready = waitFontsWithTimeout(1200)
     .then(() => new Promise(requestAnimationFrame));
 
   initLoader._running = ready.then(() => {
@@ -2175,63 +2186,92 @@ barba.init({
       timeout: 8000,
 
       once: async ({ next }) => {
+        // Scope del container corrente
         const scope = next?.container || document;
 
-        let ns = next?.container?.dataset?.barbaNamespace;
-        if (!ns) {
-          const u = new URL(window.location.href);
-          const path = u.pathname.replace(/^\/en\//, "").replace(/\/$/, "");
-          ns = pathToNamespace(path);
-          console.warn("⚠️ Namespace mancante, fallback usato:", ns);
-        }
-        applyNavbarStartTheme(ns);
-        const startTheme = getStartThemeForNs(ns);
-        forceNavbarThemeImmediate(startTheme);
-        updateCurrentNav(ns);
-
-        initLenis();
-        try { window.lenis?.stop(); } catch {}
-
-        initMenu(startTheme);
-        initFadeScroll(scope);
-        initFadeVisualScroll(scope);
-        initGlobalParallax(scope);
-        initGlobalSlider(scope);
-        // initAnimateThemeScroll(scope);
-        initCurrentYear(scope);
-        initSignature();
-        initCustomCursor();
-        preventSamePageClicks();
-        initFormSuccessTransition();
-        initModalAuto();
-        initLanguageSwitcher();
-        updateLangSwitcherLinks();
-        initHideNavbarOnScroll();
-        initBunnyPlayerBackground();
-
-        if (ns === "matrimoni") {
-          initSliderReview(next.container);
-        }
-
-        gsap.delayedCall(0.1, () => {
-          applyNavbarStartTheme(ns);
-          initNavbarThemeScroll(ns);
-        });
-
-        const heroTl = buildHeroForNamespace(ns, scope);
-        if (heroTl) heroTl.pause(0);
-
+        // 1) Avvio del loader il prima possibile
         const loaderDone = initLoader({
           onBeforeHide: () => {
-            gsap.delayedCall(0.3, () => heroTl?.play(0));
+            // Qui non facciamo nulla, l'hero parte DOPO il loader
           }
         });
 
-        forceNavbarThemeImmediate(startTheme);
-        updateCurrentNav(ns);
-        initNavbarThemeScroll(ns);
-        refreshScrollTrigger(0.3);
+        try {
+          // 2) Namespace robusto (fallback da URL, utile per Safari)
+          let ns = next?.container?.dataset?.barbaNamespace;
+          if (!ns) {
+            const u = new URL(window.location.href);
+            const path = u.pathname.replace(/^\/en\//, "").replace(/\/$/, "");
+            ns = pathToNamespace(path);
+            console.warn("⚠️ Namespace mancante, fallback usato:", ns);
+          }
 
+          // 3) Navbar, tema e nav current
+          applyNavbarStartTheme(ns);
+          const startTheme = getStartThemeForNs(ns);
+          forceNavbarThemeImmediate(startTheme);
+          updateCurrentNav(ns);
+
+          // 4) Inizializzazioni "core" ma SENZA animazioni pensanti
+          initLenis();
+          try { window.lenis?.stop(); } catch {}
+
+          initMenu();
+          initGlobalParallax(scope);
+          initGlobalSlider(scope);
+          initCurrentYear(scope);
+          initSignature();
+          initCustomCursor();
+          preventSamePageClicks();
+          initFormSuccessTransition(scope);
+          initModalAuto();
+          initLanguageSwitcher();
+          updateLangSwitcherLinks();
+          initHideNavbarOnScroll();
+          initBunnyPlayerBackground();
+
+          // Swiper extra solo dove serve
+          if (ns === "matrimoni") {
+            initSliderReview(next.container);
+            initAccordion(next.container);
+          } else if (ns === "eventi") {
+            initAccordion(next.container);
+          }
+
+          // 5) Effetti di scroll / fade solo DOPO il loader
+          loaderDone.then(() => {
+            try {
+              initFadeScroll(scope);
+              initFadeVisualScroll(scope);
+
+              gsap.delayedCall(0.05, () => {
+                applyNavbarStartTheme(ns);
+                initNavbarThemeScroll(ns);
+                if (window.lenis) window.lenis.raf(performance.now());
+                ScrollTrigger.refresh(true);
+              });
+            } catch (e) {
+              console.warn("⚠️ Errore init effetti scroll post-loader:", e);
+            }
+          });
+
+          // 6) HERO: niente attesa extra lato Safari
+          const heroTl = buildHeroForNamespace(ns, scope);
+          if (heroTl) {
+            loaderDone.then(() => {
+              try { heroTl.play(0); } catch (e) { console.warn("[HERO] errore play:", e); }
+            });
+          }
+
+          // 7) Ulteriore forza bruta sul tema navbar per evitare flash
+          forceNavbarThemeImmediate(startTheme);
+          updateCurrentNav(ns);
+
+        } catch (err) {
+          console.warn("⚠️ Errore durante l'init iniziale (once):", err);
+        }
+
+        // 8) Attendi comunque la fine del loader prima di rilasciare Barba
         await loaderDone;
       },
 
