@@ -1792,17 +1792,6 @@ function buildHeroForNamespace(ns, scope) {
 /***********************
  * LOADER
  ***********************/
-function waitFontsWithTimeout(timeout = 1200) {
-  const fontsPromise =
-    (document.fonts && document.fonts.ready)
-      ? document.fonts.ready
-      : Promise.resolve();
-
-  const timeoutPromise = new Promise(resolve => setTimeout(resolve, timeout));
-
-  return Promise.race([fontsPromise, timeoutPromise]);
-}
-
 function initLoader(opts = {}) {
   const {
     minDuration = 600,
@@ -1937,7 +1926,7 @@ function initLoader(opts = {}) {
     try { window.lenis?.start(); } catch {}
   });
 
-  const ready = waitFontsWithTimeout(1200)
+  const ready = (document.fonts?.ready || Promise.resolve())
     .then(() => new Promise(requestAnimationFrame));
 
   initLoader._running = ready.then(() => {
