@@ -2464,7 +2464,6 @@ barba.hooks.afterEnter((data) => {
 
     if (nextNs) {
       initNavbarThemeScroll(nextNs);
-      updateCurrentNav(nextNs);
     }
   });
 
