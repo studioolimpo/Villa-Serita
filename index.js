@@ -36,6 +36,8 @@ function pathToNamespace(pathname) {
     "la-villa": "villa",
     "villa": "villa",
     "halloween-in-villa": "halloween",
+    "natale-in-villa": "natale",
+    "capodanno-in-villa": "capodanno",
 
     "eventi-privati": "eventi",
     "eventi": "eventi",
@@ -203,6 +205,8 @@ const PAGE_LABELS = {
   home: { it: "Home", en: "Home" },
   villa: { it: "La Villa", en: "The Villa" },
   halloween: { it: "Halloween in Villa", en: "Halloween at The Villa" },
+  natale: { it: "Natale in Villa", en: "Christmas at The Villa" },
+  capodanno: { it: "Capodanno in Villa", en: "New Year’s Eve at The Villa" },
   matrimoni: { it: "Matrimoni", en: "Weddings" },
   eventi: { it: "Eventi Privati", en: "Private Events" },
   ristorante: { it: "Ristorante", en: "Restaurant" },
