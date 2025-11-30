@@ -2164,7 +2164,6 @@ barba.init({
       updateLangSwitcherLinks();
       initVideoSmart(scope);
 
-      initNavbarThemeScroll(ns);
       initHideNavbarOnScroll();
 
   if (ns === "matrimoni" || ns === "eventi") {
@@ -2199,8 +2198,7 @@ barba.init({
 
       initFadeScroll(scope);
       initFadeVisualScroll(scope);
-
-      
+      initNavbarThemeScroll(ns);
 
       window.lenis?.raf(performance.now());
       ScrollTrigger.refresh(true);
