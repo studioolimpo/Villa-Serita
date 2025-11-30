@@ -1553,13 +1553,30 @@ function initModalAuto(scope = document) {
       modal.addEventListener("click", (e) => e.target.closest("[data-modal-close]") && closeModal());
       modalSystem.list[modalId] = { open: openModal, close: closeModal };
 
-      // 🔹 Apertura automatica condizionata
+      // 🔹 Apertura automatica condizionata — SOLO una volta per sessione
       const modalActive = modal.getAttribute("data-modal-active") === "true";
-      if (modalActive) {
+
+      let modalAlreadySeen = false;
+      try {
+        modalAlreadySeen = window.sessionStorage?.getItem("vs_modal_seen") === "true";
+      } catch (e) {
+        modalAlreadySeen = false;
+      }
+
+      if (modalActive && !modalAlreadySeen) {
         setTimeout(() => {
-          // Only auto-open if still marked active and in DOM
-          if (modal.getAttribute("data-modal-active") === "true" && typeof modal.showModal === "function" && !modal.open && modal.isConnected) {
+          // Only auto-open if still marked active, in DOM and non ancora aperto
+          if (
+            modal.getAttribute("data-modal-active") === "true" &&
+            typeof modal.showModal === "function" &&
+            !modal.open &&
+            modal.isConnected
+          ) {
             openModal();
+            // Marca come già mostrato per tutta la sessione
+            try {
+              window.sessionStorage?.setItem("vs_modal_seen", "true");
+            } catch (e) {}
           }
         }, 6000);
       }
