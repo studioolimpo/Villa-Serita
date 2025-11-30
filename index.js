@@ -953,24 +953,49 @@ function initNavbarThemeScroll(namespace = "home") {
     contatti:    { startTheme: "light" },
   };
 
-  // pulizia vecchi trigger
+  // 🔹 Pulisce eventuali ScrollTrigger precedenti della navbar
   try {
-    ScrollTrigger.getAll().forEach(st => {
+    ScrollTrigger.getAll().forEach((st) => {
       if (st.vars.id === "navbar-theme") st.kill();
     });
   } catch (err) {
     console.warn("Errore pulizia ScrollTrigger:", err);
   }
 
-  // New config destructure and logic
   const cfg = navbarConfig[namespace] || {};
   const startTheme = cfg.startTheme || "dark";
-  const trigger = cfg.trigger || "#section-hero";
+  const trigger = cfg.trigger; // se non definito → tema fisso, niente ScrollTrigger
   const flipTo = cfg.flipTo || (startTheme === "dark" ? "light" : "dark");
 
   const nav = document.querySelector(".nav_component");
+  if (!nav) return;
+
+  // 🔹 Applica subito il tema di partenza alla navbar e alla background
+  try {
+    if (window.colorThemes && typeof window.colorThemes.getTheme === "function") {
+      const themeVars = colorThemes.getTheme(startTheme);
+      if (themeVars && typeof themeVars === "object") {
+        gsap.set(nav, { ...themeVars, overwrite: "auto" });
+      }
+    }
+  } catch (e) {
+    console.warn("Navbar start theme error:", e);
+  }
+
+  nav.setAttribute("data-theme", startTheme);
+
+  gsap.set(".nav_background", {
+    autoAlpha: startTheme === "light" ? 1 : 0,
+    overwrite: "auto",
+  });
+
+  // 🔹 Se non c'è trigger configurato → tema fisso, nessuna animazione scroll
+  if (!trigger) {
+    return;
+  }
+
   const triggerEl = document.querySelector(trigger);
-  if (!nav || !triggerEl) return;
+  if (!triggerEl) return;
 
   ScrollTrigger.create({
     id: "navbar-theme",
@@ -979,33 +1004,47 @@ function initNavbarThemeScroll(namespace = "home") {
     end: "bottom top",
     // markers: { startColor: "orange", endColor: "orange", fontSize: "10px" },
     onEnter: () => {
-      const themeVars = colorThemes.getTheme(flipTo);
-      if (themeVars) {
-        gsap.to(nav, { ...themeVars, ease: "power2.inOut", duration: 0.3 });
-        nav.setAttribute("data-theme", flipTo);
+      try {
+        if (window.colorThemes && typeof window.colorThemes.getTheme === "function") {
+          const themeVars = colorThemes.getTheme(flipTo);
+          if (themeVars && typeof themeVars === "object") {
+            gsap.to(nav, { ...themeVars, ease: "power2.inOut", duration: 0.3, overwrite: "auto" });
+          }
+        }
+      } catch (e) {
+        console.warn("Navbar flip theme error:", e);
       }
+
+      nav.setAttribute("data-theme", flipTo);
 
       // 🔹 Background nav in sync con il tema di arrivo
       gsap.to(".nav_background", {
         autoAlpha: flipTo === "light" ? 1 : 0,
         duration: 0.3,
         ease: "power2.inOut",
-        overwrite: "auto"
+        overwrite: "auto",
       });
     },
     onLeaveBack: () => {
-      const themeVars = colorThemes.getTheme(startTheme);
-      if (themeVars) {
-        gsap.to(nav, { ...themeVars, ease: "power2.inOut", duration: 0.3 });
-        nav.setAttribute("data-theme", startTheme);
+      try {
+        if (window.colorThemes && typeof window.colorThemes.getTheme === "function") {
+          const themeVars = colorThemes.getTheme(startTheme);
+          if (themeVars && typeof themeVars === "object") {
+            gsap.to(nav, { ...themeVars, ease: "power2.inOut", duration: 0.3, overwrite: "auto" });
+          }
+        }
+      } catch (e) {
+        console.warn("Navbar reset theme error:", e);
       }
+
+      nav.setAttribute("data-theme", startTheme);
 
       // 🔹 Background nav in sync con il tema di partenza
       gsap.to(".nav_background", {
         autoAlpha: startTheme === "light" ? 1 : 0,
         duration: 0.3,
         ease: "power2.inOut",
-        overwrite: "auto"
+        overwrite: "auto",
       });
     },
   });
