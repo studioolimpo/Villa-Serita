@@ -837,27 +837,31 @@ function initVideoSmart(scope = document) {
 // =====================================================
 
 /**
+ * Config globale per la navbar: tema di partenza, trigger e tema di flip
+ */
+const NAVBAR_CONFIG = {
+  home:       { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
+  villa:      { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
+  matrimoni:  { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
+  eventi:     { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
+  ristorante: { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
+  esperienze: { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
+
+  // Single experiences / eventi singoli → tema chiaro fisso
+  esperienza: { startTheme: "light" },
+  natale:     { startTheme: "light" },
+  capodanno:  { startTheme: "light" },
+  halloween:  { startTheme: "light" },
+
+  contatti:   { startTheme: "light" },
+  err404:     { startTheme: "light" },
+};
+
+/**
  * Ritorna il tema di partenza per il namespace
  */
 function getStartThemeForNs(namespace = "home") {
-  const navbarConfig = {
-    home:        { startTheme: "dark" },
-    villa:       { startTheme: "dark" },
-    matrimoni:   { startTheme: "dark" },
-    eventi:      { startTheme: "dark" },
-    ristorante:  { startTheme: "dark" },
-    esperienze:  { startTheme: "dark" },
-
-    // Single experiences / eventi singoli → tema chiaro
-    esperienza:  { startTheme: "light" },
-    natale:      { startTheme: "light" },
-    capodanno:   { startTheme: "light" },
-    halloween:   { startTheme: "light" },
-
-    contatti:    { startTheme: "light" },
-    err404:      { startTheme: "light" },
-  };
-  return (navbarConfig[namespace]?.startTheme) || "dark";
+  return (NAVBAR_CONFIG[namespace]?.startTheme) || "dark";
 }
 
 // Applica il tema iniziale della navbar senza animazioni, in modo soft (senza killTweens)
@@ -883,7 +887,6 @@ function applyNavbarStartTheme(namespace = "home") {
  * Forza IMMEDIATAMENTE il tema navbar senza animazioni, uccidendo tweens
  * e impostando lo stato della background per prevenire flash.
  */
-
 function forceNavbarThemeImmediate(theme = "dark") {
   const nav = document.querySelector(".nav_component");
   if (!nav) return;
@@ -910,51 +913,8 @@ function forceNavbarThemeImmediate(theme = "dark") {
   });
 }
 
-/**
- * Applica il tema corretto alla navbar il prima possibile
- * anche sul primissimo hard-load, prima del loader.
- */
-(function bootNavbarThemeOnHardLoad() {
-  const apply = () => {
-    try {
-      const nav = document.querySelector(".nav_component");
-      if (!nav || !window.colorThemes || typeof window.colorThemes.getTheme !== "function") return;
-
-      const u = new URL(window.location.href);
-      const path = u.pathname.replace(/^\/en\//, "").replace(/\/$/, "");
-      const ns = pathToNamespace(path);
-      const startTheme = getStartThemeForNs(ns);
-
-      // Forza subito il tema corretto (light/dark) senza animazioni
-      forceNavbarThemeImmediate(startTheme);
-      // Aggiorna lo stato "is-current" del menu in base al namespace
-      updateCurrentNav(ns);
-    } catch (err) {
-      console.warn("Navbar hard-load boot error:", err);
-    }
-  };
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", apply, { once: true });
-  } else {
-    apply();
-  }
-})();
-
 function setNavbarThemeInitial(namespace = "home") {
-  const navbarConfig = {
-    home: { startTheme: "dark" },
-    villa: { startTheme: "dark" },
-    matrimoni: { startTheme: "dark" },
-    eventi: { startTheme: "dark" },
-    ristorante: { startTheme: "dark" },
-    esperienze: { startTheme: "dark" },
-    esperienza: { startTheme: "light" },
-    contatti: { startTheme: "light" },
-    err404: { startTheme: "light" },
-  };
-
-  const { startTheme = "dark" } = navbarConfig[namespace] || {};
+  const startTheme = getStartThemeForNs(namespace);
   const nav = document.querySelector(".nav_component");
   if (!nav) return;
 
@@ -968,22 +928,6 @@ function setNavbarThemeInitial(namespace = "home") {
 }
 
 function initNavbarThemeScroll(namespace = "home") {
-  const navbarConfig = {
-    home:        { startTheme: "dark",  trigger: "#section-hero" },
-    villa:       { startTheme: "dark",  trigger: "#section-hero" },
-    matrimoni:   { startTheme: "dark",  trigger: "#section-hero" },
-    eventi:      { startTheme: "dark",  trigger: "#section-hero" },
-    ristorante:  { startTheme: "dark",  trigger: "#section-hero" },
-    esperienze:  { startTheme: "dark",  trigger: "#section-hero" },
-
-    // Single experiences / eventi singoli → tema chiaro fisso (niente ScrollTrigger)
-    esperienza:  { startTheme: "light" },
-    natale:      { startTheme: "light" },
-    capodanno:   { startTheme: "light" },
-    halloween:   { startTheme: "light" },
-
-    contatti:    { startTheme: "light" },
-  };
 
   // 🔹 Pulisce eventuali ScrollTrigger precedenti della navbar
   try {
@@ -994,7 +938,7 @@ function initNavbarThemeScroll(namespace = "home") {
     console.warn("Errore pulizia ScrollTrigger:", err);
   }
 
-  const cfg = navbarConfig[namespace] || {};
+  const cfg = NAVBAR_CONFIG[namespace] || {};
   const startTheme = cfg.startTheme || "dark";
   const trigger = cfg.trigger; // se non definito → tema fisso, niente ScrollTrigger
   const flipTo = cfg.flipTo || (startTheme === "dark" ? "light" : "dark");
