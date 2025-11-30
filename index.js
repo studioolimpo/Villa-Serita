@@ -2365,12 +2365,6 @@ function updateCurrentNav(currentNs) {
 // ================================
 
 
-function disableScrollTriggers() {
-  ScrollTrigger.getAll().forEach(st => st.disable(false));
-}
-function enableScrollTriggers() {
-  ScrollTrigger.getAll().forEach(st => st.enable(false));
-}
 
 barba.hooks.beforeEnter((data) => {
   const scope = data?.next?.container || document;
@@ -2383,7 +2377,6 @@ barba.hooks.beforeEnter((data) => {
   }
 
   initHideNavbarOnScroll(50);
-  disableScrollTriggers();
   initLenis();
   initGlobalParallax(scope);
   initGlobalSlider(scope);
@@ -2407,7 +2400,6 @@ barba.hooks.afterEnter((data) => {
   initFormSuccessTransition();
   initCurrentYear(scope);
 
-  enableScrollTriggers();
   initLanguageSwitcher();
   updateLangSwitcherLinks();
 
