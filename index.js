@@ -2163,6 +2163,7 @@ barba.init({
       initLanguageSwitcher();
       updateLangSwitcherLinks();
       initVideoSmart(scope);
+      initNavbarThemeScroll(ns);
 
       initHideNavbarOnScroll();
 
