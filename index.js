@@ -1561,7 +1561,7 @@ function initModalAuto(scope = document) {
           if (modal.getAttribute("data-modal-active") === "true" && typeof modal.showModal === "function" && !modal.open && modal.isConnected) {
             openModal();
           }
-        }, 8000);
+        }, 6000);
       }
     });
   }
