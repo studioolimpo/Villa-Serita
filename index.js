@@ -962,8 +962,11 @@ function initNavbarThemeScroll(namespace = "home") {
     console.warn("Errore pulizia ScrollTrigger:", err);
   }
 
-  const { startTheme = "dark", trigger = "#section-hero" } = navbarConfig[namespace] || {};
-  if (startTheme === "light") return;
+  // New config destructure and logic
+  const cfg = navbarConfig[namespace] || {};
+  const startTheme = cfg.startTheme || "dark";
+  const trigger = cfg.trigger || "#section-hero";
+  const flipTo = cfg.flipTo || (startTheme === "dark" ? "light" : "dark");
 
   const nav = document.querySelector(".nav_component");
   const triggerEl = document.querySelector(trigger);
@@ -976,32 +979,34 @@ function initNavbarThemeScroll(namespace = "home") {
     end: "bottom top",
     // markers: { startColor: "orange", endColor: "orange", fontSize: "10px" },
     onEnter: () => {
-      gsap.to(nav, { ...colorThemes.getTheme("light"), ease: "power2.inOut", duration: 0.3 });
-      nav.setAttribute("data-theme", "light");
+      const themeVars = colorThemes.getTheme(flipTo);
+      if (themeVars) {
+        gsap.to(nav, { ...themeVars, ease: "power2.inOut", duration: 0.3 });
+        nav.setAttribute("data-theme", flipTo);
+      }
 
-
-      // 🔹 Fade-in background nav
+      // 🔹 Background nav in sync con il tema di arrivo
       gsap.to(".nav_background", {
-        autoAlpha: 1,
+        autoAlpha: flipTo === "light" ? 1 : 0,
         duration: 0.3,
         ease: "power2.inOut",
         overwrite: "auto"
       });
-
     },
     onLeaveBack: () => {
-      gsap.to(nav, { ...colorThemes.getTheme(startTheme), ease: "power2.inOut", duration: 0.3 });
-      nav.setAttribute("data-theme", startTheme);
+      const themeVars = colorThemes.getTheme(startTheme);
+      if (themeVars) {
+        gsap.to(nav, { ...themeVars, ease: "power2.inOut", duration: 0.3 });
+        nav.setAttribute("data-theme", startTheme);
+      }
 
-
-      // 🔹 Fade-out background nav
+      // 🔹 Background nav in sync con il tema di partenza
       gsap.to(".nav_background", {
-        autoAlpha: 0,
+        autoAlpha: startTheme === "light" ? 1 : 0,
         duration: 0.3,
         ease: "power2.inOut",
         overwrite: "auto"
       });
-
     },
   });
 }
