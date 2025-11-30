@@ -1482,15 +1482,16 @@ function initAccordion(scope = document) {
 /***********************
  * MODAL HANDLER — apertura automatica con controllo attributo
  ***********************/
-function initModalAuto() {
+function initModalAuto(scope = document) {
   const modalSystem = ((window.lumos ??= {}).modal ??= {
     list: {},
     open(id) { this.list[id]?.open?.(); },
     closeAll() { Object.values(this.list).forEach((m) => m.close?.()); },
   });
 
+  // Create/initialize modals only within the given scope
   function createModals() {
-    document.querySelectorAll(".modal_dialog").forEach(function (modal) {
+    scope.querySelectorAll(".modal_dialog").forEach(function (modal) {
       if (modal.dataset.scriptInitialized) return;
       modal.dataset.scriptInitialized = "true";
 
@@ -1519,7 +1520,10 @@ function initModalAuto() {
         if (typeof lenis !== "undefined" && lenis.stop) lenis.stop();
         else document.body.style.overflow = "hidden";
         lastFocusedElement = document.activeElement;
-        modal.showModal();
+        // DOM safety: only call showModal if not already open and dialog is in DOM
+        if (typeof modal.showModal === "function" && !modal.open && modal.isConnected) {
+          modal.showModal();
+        }
         modal.querySelector(':focus')?.blur();
         if (typeof gsap !== "undefined") modal.tl.play();
         modal.querySelectorAll("[data-modal-scroll]").forEach((el) => (el.scrollTop = 0));
@@ -1553,23 +1557,17 @@ function initModalAuto() {
       const modalActive = modal.getAttribute("data-modal-active") === "true";
       if (modalActive) {
         setTimeout(() => {
-          if (modal.getAttribute("data-modal-active") === "true") {
+          // Only auto-open if still marked active and in DOM
+          if (modal.getAttribute("data-modal-active") === "true" && typeof modal.showModal === "function" && !modal.open && modal.isConnected) {
             openModal();
           }
         }, 8000);
-      } else {
       }
     });
   }
 
-  // Esegui subito e dopo ogni cambio pagina
+  // Esegui subito
   createModals();
-
-  if (window.barba) {
-    barba.hooks.afterEnter(() => {
-      createModals();
-    });
-  }
 }
 
 /***********************
@@ -2446,7 +2444,11 @@ barba.hooks.afterEnter((data) => {
   const nextNs = data?.next?.container?.dataset?.barbaNamespace;
   const scope = data?.next?.container || document;
 
-
+  // Insert modal auto open for home namespace
+  const ns = data?.next?.container?.dataset?.barbaNamespace;
+  if (ns === "home") {
+    initModalAuto(scope);
+  }
 
   initFormSuccessTransition();
   initCurrentYear(scope);
@@ -2455,12 +2457,10 @@ barba.hooks.afterEnter((data) => {
   initLanguageSwitcher();
   updateLangSwitcherLinks();
 
-
   gsap.delayedCall(0.1, () => {
     if (window.lenis) window.lenis.raf(performance.now());
     ScrollTrigger.refresh(true);
   });
-
 
   gsap.delayedCall(0.3, () => {
     if (window.lenis) window.lenis.raf(performance.now());
