@@ -2164,7 +2164,6 @@ barba.init({
       updateLangSwitcherLinks();
       initVideoSmart(scope);
 
-      applyNavbarStartTheme(ns);
       initNavbarThemeScroll(ns);
       initHideNavbarOnScroll();
 
@@ -2535,13 +2534,13 @@ barba.hooks.afterEnter((data) => {
     ScrollTrigger.refresh(true);
   });
 
+  if (nextNs) {
+    initNavbarThemeScroll(nextNs);
+  }
+
   gsap.delayedCall(0.3, () => {
     if (window.lenis) window.lenis.raf(performance.now());
     ScrollTrigger.refresh(true);
-
-    if (nextNs) {
-      initNavbarThemeScroll(nextNs);
-    }
   });
 
   gsap.delayedCall(0.4, () => {
