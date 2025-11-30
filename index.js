@@ -841,15 +841,21 @@ function initVideoSmart(scope = document) {
  */
 function getStartThemeForNs(namespace = "home") {
   const navbarConfig = {
-    home: { startTheme: "dark" },
-    villa: { startTheme: "dark" },
-    matrimoni: { startTheme: "dark" },
-    eventi: { startTheme: "dark" },
-    ristorante: { startTheme: "dark" },
-    esperienze: { startTheme: "dark" },
-    esperienza: { startTheme: "light" },
-    contatti: { startTheme: "light" },
-    err404: { startTheme: "light" },
+    home:        { startTheme: "dark" },
+    villa:       { startTheme: "dark" },
+    matrimoni:   { startTheme: "dark" },
+    eventi:      { startTheme: "dark" },
+    ristorante:  { startTheme: "dark" },
+    esperienze:  { startTheme: "dark" },
+
+    // Single experiences / eventi singoli → tema chiaro
+    esperienza:  { startTheme: "light" },
+    natale:      { startTheme: "light" },
+    capodanno:   { startTheme: "light" },
+    halloween:   { startTheme: "light" },
+
+    contatti:    { startTheme: "light" },
+    err404:      { startTheme: "light" },
   };
   return (navbarConfig[namespace]?.startTheme) || "dark";
 }
@@ -931,14 +937,20 @@ function setNavbarThemeInitial(namespace = "home") {
 
 function initNavbarThemeScroll(namespace = "home") {
   const navbarConfig = {
-    home: { startTheme: "dark", trigger: "#section-hero" },
-    villa: { startTheme: "dark", trigger: "#section-hero" },
-    matrimoni: { startTheme: "dark", trigger: "#section-hero" },
-    eventi: { startTheme: "dark", trigger: "#section-hero" },
-    ristorante: { startTheme: "dark", trigger: "#section-hero" },
-    esperienze: { startTheme: "dark", trigger: "#section-hero" },
-    esperienza: { startTheme: "light" },
-    contatti: { startTheme: "light" },
+    home:        { startTheme: "dark",  trigger: "#section-hero" },
+    villa:       { startTheme: "dark",  trigger: "#section-hero" },
+    matrimoni:   { startTheme: "dark",  trigger: "#section-hero" },
+    eventi:      { startTheme: "dark",  trigger: "#section-hero" },
+    ristorante:  { startTheme: "dark",  trigger: "#section-hero" },
+    esperienze:  { startTheme: "dark",  trigger: "#section-hero" },
+
+    // Single experiences / eventi singoli → tema chiaro fisso (niente ScrollTrigger)
+    esperienza:  { startTheme: "light" },
+    natale:      { startTheme: "light" },
+    capodanno:   { startTheme: "light" },
+    halloween:   { startTheme: "light" },
+
+    contatti:    { startTheme: "light" },
   };
 
   // pulizia vecchi trigger
