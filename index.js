@@ -883,6 +883,7 @@ function applyNavbarStartTheme(namespace = "home") {
  * Forza IMMEDIATAMENTE il tema navbar senza animazioni, uccidendo tweens
  * e impostando lo stato della background per prevenire flash.
  */
+
 function forceNavbarThemeImmediate(theme = "dark") {
   const nav = document.querySelector(".nav_component");
   if (!nav) return;
@@ -908,6 +909,37 @@ function forceNavbarThemeImmediate(theme = "dark") {
     overwrite: "auto"
   });
 }
+
+/**
+ * Applica il tema corretto alla navbar il prima possibile
+ * anche sul primissimo hard-load, prima del loader.
+ */
+(function bootNavbarThemeOnHardLoad() {
+  const apply = () => {
+    try {
+      const nav = document.querySelector(".nav_component");
+      if (!nav || !window.colorThemes || typeof window.colorThemes.getTheme !== "function") return;
+
+      const u = new URL(window.location.href);
+      const path = u.pathname.replace(/^\/en\//, "").replace(/\/$/, "");
+      const ns = pathToNamespace(path);
+      const startTheme = getStartThemeForNs(ns);
+
+      // Forza subito il tema corretto (light/dark) senza animazioni
+      forceNavbarThemeImmediate(startTheme);
+      // Aggiorna lo stato "is-current" del menu in base al namespace
+      updateCurrentNav(ns);
+    } catch (err) {
+      console.warn("Navbar hard-load boot error:", err);
+    }
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", apply, { once: true });
+  } else {
+    apply();
+  }
+})();
 
 function setNavbarThemeInitial(namespace = "home") {
   const navbarConfig = {
@@ -2163,8 +2195,8 @@ barba.init({
       initLanguageSwitcher();
       updateLangSwitcherLinks();
       initVideoSmart(scope);
-      initNavbarThemeScroll(ns);
 
+      initNavbarThemeScroll(ns);
       initHideNavbarOnScroll();
 
   if (ns === "matrimoni" || ns === "eventi") {
@@ -2199,7 +2231,8 @@ barba.init({
 
       initFadeScroll(scope);
       initFadeVisualScroll(scope);
-      initNavbarThemeScroll(ns);
+
+      
 
       window.lenis?.raf(performance.now());
       ScrollTrigger.refresh(true);
