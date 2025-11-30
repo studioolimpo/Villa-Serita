@@ -837,42 +837,57 @@ function initVideoSmart(scope = document) {
 // =====================================================
 
 /**
- * Config globale per la navbar: tema di partenza, trigger e tema di flip
- */
-const NAVBAR_CONFIG = {
-  home:       { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
-  villa:      { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
-  matrimoni:  { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
-  eventi:     { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
-  ristorante: { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
-  esperienze: { startTheme: "dark",  trigger: "#section-hero", flipTo: "light" },
-
-  // Single experiences / eventi singoli → tema chiaro fisso
-  esperienza: { startTheme: "light" },
-  natale:     { startTheme: "light" },
-  capodanno:  { startTheme: "light" },
-  halloween:  { startTheme: "light" },
-
-  contatti:   { startTheme: "light" },
-  err404:     { startTheme: "light" },
-};
-
-/**
  * Ritorna il tema di partenza per il namespace
  */
 function getStartThemeForNs(namespace = "home") {
-  return (NAVBAR_CONFIG[namespace]?.startTheme) || "dark";
+  const navbarConfig = {
+    home:        { startTheme: "dark" },
+    villa:       { startTheme: "dark" },
+    matrimoni:   { startTheme: "dark" },
+    eventi:      { startTheme: "dark" },
+    ristorante:  { startTheme: "dark" },
+    esperienze:  { startTheme: "dark" },
+
+    // Single experiences / eventi singoli → tema chiaro
+    esperienza:  { startTheme: "light" },
+    natale:      { startTheme: "light" },
+    capodanno:   { startTheme: "light" },
+    halloween:   { startTheme: "light" },
+
+    contatti:    { startTheme: "light" },
+    err404:      { startTheme: "light" },
+  };
+  return (navbarConfig[namespace]?.startTheme) || "dark";
+}
+
+// Applica il tema iniziale della navbar senza animazioni, in modo soft (senza killTweens)
+function applyNavbarStartTheme(namespace = "home") {
+  const nav = document.querySelector(".nav_component");
+  if (!nav || !window.colorThemes || !window.colorThemes.getTheme) return;
+
+  const startTheme = getStartThemeForNs(namespace);
+  const vars = colorThemes.getTheme(startTheme);
+
+  // 🔹 Applica il tema iniziale senza animazioni
+  gsap.set(nav, vars);
+  nav.setAttribute("data-theme", startTheme);
+
+  // 🔹 Gestisce anche la background
+  gsap.set(".nav_background", {
+    autoAlpha: startTheme === "light" ? 1 : 0,
+  });
+
 }
 
 /**
- * Imposta il tema della navbar (light/dark) in modo immediato.
- * Usa colorThemes + gestisce anche la .nav_background
+ * Forza IMMEDIATAMENTE il tema navbar senza animazioni, uccidendo tweens
+ * e impostando lo stato della background per prevenire flash.
  */
-function setNavbarTheme(theme = "dark") {
+function forceNavbarThemeImmediate(theme = "dark") {
   const nav = document.querySelector(".nav_component");
   if (!nav) return;
 
-  // niente vecchie animazioni che sporcano
+  // evita transizioni residue
   gsap.killTweensOf(nav);
   gsap.killTweensOf(".nav_background");
 
@@ -883,19 +898,61 @@ function setNavbarTheme(theme = "dark") {
         gsap.set(nav, { ...vars, overwrite: "auto" });
       }
     }
-  } catch (e) {
-    console.warn("Navbar theme error:", e);
-  }
+  } catch {}
 
   nav.setAttribute("data-theme", theme);
 
+  // background nav in sync con il tema
   gsap.set(".nav_background", {
     autoAlpha: theme === "light" ? 1 : 0,
     overwrite: "auto"
   });
 }
 
+function setNavbarThemeInitial(namespace = "home") {
+  const navbarConfig = {
+    home: { startTheme: "dark" },
+    villa: { startTheme: "dark" },
+    matrimoni: { startTheme: "dark" },
+    eventi: { startTheme: "dark" },
+    ristorante: { startTheme: "dark" },
+    esperienze: { startTheme: "dark" },
+    esperienza: { startTheme: "light" },
+    contatti: { startTheme: "light" },
+    err404: { startTheme: "light" },
+  };
+
+  const { startTheme = "dark" } = navbarConfig[namespace] || {};
+  const nav = document.querySelector(".nav_component");
+  if (!nav) return;
+
+  try {
+    const vars = colorThemes.getTheme(startTheme);
+    if (vars && typeof vars === "object") gsap.set(nav, { ...vars });
+    nav.setAttribute("data-theme", startTheme);
+  } catch (e) {
+    console.warn("Navbar initial theme error:", e);
+  }
+}
+
 function initNavbarThemeScroll(namespace = "home") {
+  const navbarConfig = {
+    home:        { startTheme: "dark",  trigger: "#section-hero" },
+    villa:       { startTheme: "dark",  trigger: "#section-hero" },
+    matrimoni:   { startTheme: "dark",  trigger: "#section-hero" },
+    eventi:      { startTheme: "dark",  trigger: "#section-hero" },
+    ristorante:  { startTheme: "dark",  trigger: "#section-hero" },
+    esperienze:  { startTheme: "dark",  trigger: "#section-hero" },
+
+    // Single experiences / eventi singoli → tema chiaro fisso (niente ScrollTrigger)
+    esperienza:  { startTheme: "light" },
+    natale:      { startTheme: "light" },
+    capodanno:   { startTheme: "light" },
+    halloween:   { startTheme: "light" },
+
+    contatti:    { startTheme: "light" },
+  };
+
   // 🔹 Pulisce eventuali ScrollTrigger precedenti della navbar
   try {
     ScrollTrigger.getAll().forEach((st) => {
@@ -905,16 +962,32 @@ function initNavbarThemeScroll(namespace = "home") {
     console.warn("Errore pulizia ScrollTrigger:", err);
   }
 
-  const cfg = NAVBAR_CONFIG[namespace] || {};
+  const cfg = navbarConfig[namespace] || {};
   const startTheme = cfg.startTheme || "dark";
-  const trigger = cfg.trigger; // se non definito → tema fisso, nessuna animazione scroll
+  const trigger = cfg.trigger; // se non definito → tema fisso, niente ScrollTrigger
   const flipTo = cfg.flipTo || (startTheme === "dark" ? "light" : "dark");
 
   const nav = document.querySelector(".nav_component");
   if (!nav) return;
 
   // 🔹 Applica subito il tema di partenza alla navbar e alla background
-  setNavbarTheme(startTheme);
+  try {
+    if (window.colorThemes && typeof window.colorThemes.getTheme === "function") {
+      const themeVars = colorThemes.getTheme(startTheme);
+      if (themeVars && typeof themeVars === "object") {
+        gsap.set(nav, { ...themeVars, overwrite: "auto" });
+      }
+    }
+  } catch (e) {
+    console.warn("Navbar start theme error:", e);
+  }
+
+  nav.setAttribute("data-theme", startTheme);
+
+  gsap.set(".nav_background", {
+    autoAlpha: startTheme === "light" ? 1 : 0,
+    overwrite: "auto",
+  });
 
   // 🔹 Se non c'è trigger configurato → tema fisso, nessuna animazione scroll
   if (!trigger) {
@@ -931,10 +1004,48 @@ function initNavbarThemeScroll(namespace = "home") {
     end: "bottom top",
     // markers: { startColor: "orange", endColor: "orange", fontSize: "10px" },
     onEnter: () => {
-      setNavbarTheme(flipTo);
+      try {
+        if (window.colorThemes && typeof window.colorThemes.getTheme === "function") {
+          const themeVars = colorThemes.getTheme(flipTo);
+          if (themeVars && typeof themeVars === "object") {
+            gsap.to(nav, { ...themeVars, ease: "power2.inOut", duration: 0.3, overwrite: "auto" });
+          }
+        }
+      } catch (e) {
+        console.warn("Navbar flip theme error:", e);
+      }
+
+      nav.setAttribute("data-theme", flipTo);
+
+      // 🔹 Background nav in sync con il tema di arrivo
+      gsap.to(".nav_background", {
+        autoAlpha: flipTo === "light" ? 1 : 0,
+        duration: 0.3,
+        ease: "power2.inOut",
+        overwrite: "auto",
+      });
     },
     onLeaveBack: () => {
-      setNavbarTheme(startTheme);
+      try {
+        if (window.colorThemes && typeof window.colorThemes.getTheme === "function") {
+          const themeVars = colorThemes.getTheme(startTheme);
+          if (themeVars && typeof themeVars === "object") {
+            gsap.to(nav, { ...themeVars, ease: "power2.inOut", duration: 0.3, overwrite: "auto" });
+          }
+        }
+      } catch (e) {
+        console.warn("Navbar reset theme error:", e);
+      }
+
+      nav.setAttribute("data-theme", startTheme);
+
+      // 🔹 Background nav in sync con il tema di partenza
+      gsap.to(".nav_background", {
+        autoAlpha: startTheme === "light" ? 1 : 0,
+        duration: 0.3,
+        ease: "power2.inOut",
+        overwrite: "auto",
+      });
     },
   });
 }
@@ -2032,56 +2143,53 @@ barba.init({
   }
 
   /*--------------------------------------------------------------
-    2) Inits LEGGERE (non bloccano Safari e non toccano il tema)
+    2) Navbar: tema iniziale immediato (solo CSS, zero JS pesante)
   --------------------------------------------------------------*/
-  initMenu();
-  initCurrentYear(scope);
-  initSignature();
-  initCustomCursor();
-  preventSamePageClicks();
-  initFormSuccessTransition(scope);
-  initModalAuto();
-  initLanguageSwitcher();
-  updateLangSwitcherLinks();
-  initVideoSmart(scope);
+  const startTheme = getStartThemeForNs(ns);
+  applyNavbarStartTheme(ns);
+  forceNavbarThemeImmediate(startTheme);
+  updateCurrentNav(ns);
 
-  // eventuali componenti specifici
+  /*--------------------------------------------------------------
+    3) Inits LEGGERE (non bloccano Safari)
+  --------------------------------------------------------------*/
+      initMenu();
+      initCurrentYear(scope);
+      initSignature();
+      initCustomCursor();
+      preventSamePageClicks();
+      initFormSuccessTransition(scope);
+      initModalAuto();
+      initLanguageSwitcher();
+      updateLangSwitcherLinks();
+      initVideoSmart(scope);
+
+      initNavbarThemeScroll(ns);
+      initHideNavbarOnScroll();
+
   if (ns === "matrimoni" || ns === "eventi") {
     initAccordion(next.container);
   }
 
   /*--------------------------------------------------------------
-    3) Precostruzione HERO (ferma in pausa)
+    4) Precostruzione HERO (ferma in pausa)
   --------------------------------------------------------------*/
   const heroTl = buildHeroForNamespace(ns, scope);
 
   /*--------------------------------------------------------------
-    4) Loader – qui nascondiamo il cambio tema iniziale
+    5) Loader – parte SUBITO, e lancia hero al momento giusto
   --------------------------------------------------------------*/
   const loaderDone = initLoader({
     onBeforeHide: () => {
-      try {
-        const startTheme = getStartThemeForNs(ns);
-        setNavbarTheme(startTheme);
-        updateCurrentNav(ns);
-        initNavbarThemeScroll(ns);
-        initHideNavbarOnScroll();
-      } catch (e) {
-        console.warn("Navbar/hero init error in onBeforeHide:", e);
-      }
-
-      try {
-        heroTl?.play(0);
-      } catch (e) {
-        console.warn("Hero early play error:", e);
-      }
+      try { heroTl?.play(0); } catch(e) { console.warn("Hero early play error:", e); }
     }
   });
 
   /*--------------------------------------------------------------
-    5) PIPELINE POST-LOADER (scroll, parallax, slider, ecc.)
+    6) PIPELINE POST-LOADER (SOLO 2 FASI)
   --------------------------------------------------------------*/
   loaderDone.then(() => {
+
     /*----------------------------------------
       FASE 1 — CRITICAL (subito dopo loader)
     ----------------------------------------*/
@@ -2092,10 +2200,12 @@ barba.init({
       initFadeScroll(scope);
       initFadeVisualScroll(scope);
 
+      
+
       window.lenis?.raf(performance.now());
       ScrollTrigger.refresh(true);
 
-    } catch (err) {
+    } catch(err) {
       console.warn("⚠️ Errore FASE 1:", err);
     }
 
@@ -2111,13 +2221,15 @@ barba.init({
           initSliderReview(next.container);
         }
 
+
         window.lenis?.raf(performance.now());
         ScrollTrigger.refresh(true);
 
-      } catch (err) {
+      } catch(err) {
         console.warn("⚠️ Errore FASE 2:", err);
       }
     });
+
   });
 
   // Barba aspetta la fine del loader
@@ -2365,18 +2477,31 @@ function updateCurrentNav(currentNs) {
 // ================================
 
 
+function disableScrollTriggers() {
+  ScrollTrigger.getAll().forEach(st => st.disable(false));
+}
+function enableScrollTriggers() {
+  ScrollTrigger.getAll().forEach(st => st.enable(false));
+}
 
 barba.hooks.beforeEnter((data) => {
   const scope = data?.next?.container || document;
   const nextNs = data?.next?.container?.dataset?.barbaNamespace;
 
+
   if (nextNs) {
     const startTheme = getStartThemeForNs(nextNs);
-    setNavbarTheme(startTheme);
+    forceNavbarThemeImmediate(startTheme);
     updateCurrentNav(nextNs);
   }
 
+  
   initHideNavbarOnScroll(50);
+
+
+  disableScrollTriggers();
+
+
   initLenis();
   initGlobalParallax(scope);
   initGlobalSlider(scope);
@@ -2400,6 +2525,7 @@ barba.hooks.afterEnter((data) => {
   initFormSuccessTransition();
   initCurrentYear(scope);
 
+  enableScrollTriggers();
   initLanguageSwitcher();
   updateLangSwitcherLinks();
 
