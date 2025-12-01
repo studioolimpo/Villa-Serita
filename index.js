@@ -909,6 +909,34 @@ function forceNavbarThemeImmediate(theme = "dark") {
   });
 }
 
+/**
+ * Applica il tema iniziale della navbar una sola volta,
+ * aspettando colorThemes se necessario.
+ */
+function applyNavbarInitialThemeOnce(namespace = "home") {
+  const theme = getStartThemeForNs(namespace);
+
+  const apply = () => {
+    try {
+      forceNavbarThemeImmediate(theme);
+    } catch (e) {
+      console.warn("Navbar initial theme apply error:", e);
+    }
+  };
+
+  // Se colorThemes è già pronto, applica subito
+  if (window.colorThemes && typeof window.colorThemes.getTheme === "function") {
+    apply();
+  } else {
+    // Altrimenti attendi l'evento globale emesso dal Theme Collector
+    const handler = () => {
+      document.removeEventListener("colorThemesReady", handler);
+      apply();
+    };
+    document.addEventListener("colorThemesReady", handler);
+  }
+}
+
 function setNavbarThemeInitial(namespace = "home") {
   const navbarConfig = {
     home: { startTheme: "dark" },
@@ -2099,33 +2127,10 @@ barba.init({
   }
 
   /*--------------------------------------------------------------
-    2) Navbar: tema iniziale immediato (solo CSS, zero JS pesante)
+    2) Navbar: tema iniziale — forza subito il tema corretto
   --------------------------------------------------------------*/
   const startTheme = getStartThemeForNs(ns);
-
-  // Se il namespace richiede un tema chiaro, forziamo SUBITO i colori
-  // della navbar usando direttamente colorThemes.getTheme("light")
-  // per sovrascrivere lo stato iniziale Webflow (che è dark).
-  try {
-    if (startTheme === "light" && window.colorThemes && typeof window.colorThemes.getTheme === "function") {
-      const vars = colorThemes.getTheme("light");
-      if (vars && typeof vars === "object") {
-        gsap.set(".nav_component", { ...vars, overwrite: "auto" });
-        gsap.set(".nav_background", {
-          autoAlpha: 1,
-          overwrite: "auto"
-        });
-        const navEl = document.querySelector(".nav_component");
-        if (navEl) navEl.setAttribute("data-theme", "light");
-      }
-    }
-  } catch (e) {
-    console.warn("Navbar light theme immediate init error:", e);
-  }
-
-  // Manteniamo comunque la logica esistente per garantire coerenza
-  // con tutte le altre pagine e con il resto del codice.
-  applyNavbarStartTheme(ns);
+  // Forza immediatamente il tema della navbar (anche se colorThemes non è ancora pronto)
   forceNavbarThemeImmediate(startTheme);
   updateCurrentNav(ns);
 
@@ -2143,7 +2148,6 @@ barba.init({
       updateLangSwitcherLinks();
       initVideoSmart(scope);
 
-      applyNavbarStartTheme(ns);
       initNavbarThemeScroll(ns);
       initHideNavbarOnScroll();
 
@@ -2158,10 +2162,22 @@ barba.init({
 
   /*--------------------------------------------------------------
     5) Loader – parte SUBITO, e lancia hero al momento giusto
+       Qui forziamo di nuovo il tema navbar appena prima che il loader vada via,
+       così qualsiasi ritardo di colorThemes viene nascosto sotto il pannello.
   --------------------------------------------------------------*/
   const loaderDone = initLoader({
     onBeforeHide: () => {
-      try { heroTl?.play(0); } catch(e) { console.warn("Hero early play error:", e); }
+      try {
+        // Assicura che la navbar sia già nel tema corretto prima di togliere il loader
+        forceNavbarThemeImmediate(startTheme);
+      } catch (e) {
+        console.warn("Navbar theme force before hide error:", e);
+      }
+      try {
+        heroTl?.play(0);
+      } catch (e) {
+        console.warn("Hero early play error:", e);
+      }
     }
   });
 
