@@ -953,49 +953,21 @@ function initNavbarThemeScroll(namespace = "home") {
     contatti:    { startTheme: "light" },
   };
 
-  // 🔹 Pulisce eventuali ScrollTrigger precedenti della navbar
+  // pulizia vecchi trigger
   try {
-    ScrollTrigger.getAll().forEach((st) => {
+    ScrollTrigger.getAll().forEach(st => {
       if (st.vars.id === "navbar-theme") st.kill();
     });
   } catch (err) {
     console.warn("Errore pulizia ScrollTrigger:", err);
   }
 
-  const cfg = navbarConfig[namespace] || {};
-  const startTheme = cfg.startTheme || "dark";
-  const trigger = cfg.trigger; // se non definito → tema fisso, niente ScrollTrigger
-  const flipTo = cfg.flipTo || (startTheme === "dark" ? "light" : "dark");
+  const { startTheme = "dark", trigger = "#section-hero" } = navbarConfig[namespace] || {};
+  if (startTheme === "light") return;
 
   const nav = document.querySelector(".nav_component");
-  if (!nav) return;
-
-  // 🔹 Applica subito il tema di partenza alla navbar e alla background
-  try {
-    if (window.colorThemes && typeof window.colorThemes.getTheme === "function") {
-      const themeVars = colorThemes.getTheme(startTheme);
-      if (themeVars && typeof themeVars === "object") {
-        gsap.set(nav, { ...themeVars, overwrite: "auto" });
-      }
-    }
-  } catch (e) {
-    console.warn("Navbar start theme error:", e);
-  }
-
-  nav.setAttribute("data-theme", startTheme);
-
-  gsap.set(".nav_background", {
-    autoAlpha: startTheme === "light" ? 1 : 0,
-    overwrite: "auto",
-  });
-
-  // 🔹 Se non c'è trigger configurato → tema fisso, nessuna animazione scroll
-  if (!trigger) {
-    return;
-  }
-
   const triggerEl = document.querySelector(trigger);
-  if (!triggerEl) return;
+  if (!nav || !triggerEl) return;
 
   ScrollTrigger.create({
     id: "navbar-theme",
@@ -1004,48 +976,32 @@ function initNavbarThemeScroll(namespace = "home") {
     end: "bottom top",
     // markers: { startColor: "orange", endColor: "orange", fontSize: "10px" },
     onEnter: () => {
-      try {
-        if (window.colorThemes && typeof window.colorThemes.getTheme === "function") {
-          const themeVars = colorThemes.getTheme(flipTo);
-          if (themeVars && typeof themeVars === "object") {
-            gsap.to(nav, { ...themeVars, ease: "power2.inOut", duration: 0.3, overwrite: "auto" });
-          }
-        }
-      } catch (e) {
-        console.warn("Navbar flip theme error:", e);
-      }
+      gsap.to(nav, { ...colorThemes.getTheme("light"), ease: "power2.inOut", duration: 0.3 });
+      nav.setAttribute("data-theme", "light");
 
-      nav.setAttribute("data-theme", flipTo);
 
-      // 🔹 Background nav in sync con il tema di arrivo
+      // 🔹 Fade-in background nav
       gsap.to(".nav_background", {
-        autoAlpha: flipTo === "light" ? 1 : 0,
+        autoAlpha: 1,
         duration: 0.3,
         ease: "power2.inOut",
-        overwrite: "auto",
+        overwrite: "auto"
       });
+
     },
     onLeaveBack: () => {
-      try {
-        if (window.colorThemes && typeof window.colorThemes.getTheme === "function") {
-          const themeVars = colorThemes.getTheme(startTheme);
-          if (themeVars && typeof themeVars === "object") {
-            gsap.to(nav, { ...themeVars, ease: "power2.inOut", duration: 0.3, overwrite: "auto" });
-          }
-        }
-      } catch (e) {
-        console.warn("Navbar reset theme error:", e);
-      }
-
+      gsap.to(nav, { ...colorThemes.getTheme(startTheme), ease: "power2.inOut", duration: 0.3 });
       nav.setAttribute("data-theme", startTheme);
 
-      // 🔹 Background nav in sync con il tema di partenza
+
+      // 🔹 Fade-out background nav
       gsap.to(".nav_background", {
-        autoAlpha: startTheme === "light" ? 1 : 0,
+        autoAlpha: 0,
         duration: 0.3,
         ease: "power2.inOut",
-        overwrite: "auto",
+        overwrite: "auto"
       });
+
     },
   });
 }
@@ -2146,6 +2102,29 @@ barba.init({
     2) Navbar: tema iniziale immediato (solo CSS, zero JS pesante)
   --------------------------------------------------------------*/
   const startTheme = getStartThemeForNs(ns);
+
+  // Se il namespace richiede un tema chiaro, forziamo SUBITO i colori
+  // della navbar usando direttamente colorThemes.getTheme("light")
+  // per sovrascrivere lo stato iniziale Webflow (che è dark).
+  try {
+    if (startTheme === "light" && window.colorThemes && typeof window.colorThemes.getTheme === "function") {
+      const vars = colorThemes.getTheme("light");
+      if (vars && typeof vars === "object") {
+        gsap.set(".nav_component", { ...vars, overwrite: "auto" });
+        gsap.set(".nav_background", {
+          autoAlpha: 1,
+          overwrite: "auto"
+        });
+        const navEl = document.querySelector(".nav_component");
+        if (navEl) navEl.setAttribute("data-theme", "light");
+      }
+    }
+  } catch (e) {
+    console.warn("Navbar light theme immediate init error:", e);
+  }
+
+  // Manteniamo comunque la logica esistente per garantire coerenza
+  // con tutte le altre pagine e con il resto del codice.
   applyNavbarStartTheme(ns);
   forceNavbarThemeImmediate(startTheme);
   updateCurrentNav(ns);
@@ -2164,6 +2143,7 @@ barba.init({
       updateLangSwitcherLinks();
       initVideoSmart(scope);
 
+      applyNavbarStartTheme(ns);
       initNavbarThemeScroll(ns);
       initHideNavbarOnScroll();
 
@@ -2534,13 +2514,13 @@ barba.hooks.afterEnter((data) => {
     ScrollTrigger.refresh(true);
   });
 
-  if (nextNs) {
-    initNavbarThemeScroll(nextNs);
-  }
-
   gsap.delayedCall(0.3, () => {
     if (window.lenis) window.lenis.raf(performance.now());
     ScrollTrigger.refresh(true);
+
+    if (nextNs) {
+      initNavbarThemeScroll(nextNs);
+    }
   });
 
   gsap.delayedCall(0.4, () => {
